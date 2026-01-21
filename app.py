@@ -87,7 +87,7 @@ def render_dashboard_view():
         st.markdown("### 📋 Executive Reporting")
         if st.button("Generate Executive Summary", type="primary", use_container_width=True):
             with st.spinner("Preparing board-ready insights..."):
-                time.sleep(2) # Demo effect
+                time.sleep(0.5) # Demo effect
                 st.session_state['show_executive_summary'] = True
         
         if st.session_state.get('show_executive_summary'):

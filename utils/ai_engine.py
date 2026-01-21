@@ -7,8 +7,8 @@ def generate_insight(query, df):
     Mock AI engine that generates structured responses based on the query.
     In a real app, this would call OpenAI API.
     """
-    # Simulate network latency for realism
-    time.sleep(1.5)
+    # Simulate network latency for realism (reduced for performance)
+    time.sleep(0.5)
     
     query_lower = query.lower()
     
