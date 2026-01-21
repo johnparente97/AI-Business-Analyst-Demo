@@ -1,6 +1,6 @@
 # AI Business Analyst Demo (InsightBridge)
 
-**[🚀 Launch App Now (Live Demo)](https://johnparente97.github.io/insightbridge-ai/)**  
+**[🚀 Launch App Now (Live Demo)](https://johnparente97.github.io/AI-Business-Analyst-Demo/)**  
 *(Serverless AI Analytics running entirely in your browser)*
 
 ---
@@ -40,7 +40,7 @@ Want your own copy?
 
 ## 🛠️ Local Development
 ```bash
-git clone https://github.com/johnparente97/insightbridge-ai.git
+git clone https://github.com/johnparente97/AI-Business-Analyst-Demo.git
 pip install -r requirements.txt
 streamlit run app.py
 ```
