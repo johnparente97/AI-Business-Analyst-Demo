@@ -1,0 +1,55 @@
+import pandas as pd
+import streamlit as st
+import io
+
+def load_csv(uploaded_file):
+    """
+    Loads CSV and returns a pandas DataFrame.
+    """
+    try:
+        if isinstance(uploaded_file, str):
+            # For testing or if path is passed
+            df = pd.read_csv(uploaded_file)
+        else:
+            # For Streamlit file uploader
+            uploaded_file.seek(0)
+            df = pd.read_csv(uploaded_file)
+        
+        # Basic cleanup: Standardize headers
+        df.columns = [c.strip() for c in df.columns]
+        
+        return df
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
+
+def get_data_summary(df):
+    """
+    Returns a dictionary with dataset metadata.
+    """
+    if df is None:
+        return None
+        
+    summary = {
+        "rows": len(df),
+        "cols": len(df.columns),
+        "missing_values": df.isnull().sum().sum(),
+        "date_range": "N/A"
+    }
+    
+    # Attempt to find a date column
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            summary["date_range"] = f"{df[col].min().date()} to {df[col].max().date()}"
+            break
+        # Heuristic check for date strings if not typed
+        elif "date" in col.lower() or "time" in col.lower():
+            try:
+                converted = pd.to_datetime(df[col], errors='coerce').dropna()
+                if not converted.empty:
+                    summary["date_range"] = f"{converted.min().date()} to {converted.max().date()}"
+                    break
+            except:
+                pass
+                
+    return summary
