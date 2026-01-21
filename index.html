@@ -93,6 +93,15 @@
       }
     }, document.getElementById("root")).then(() => {
       document.getElementById("custom-loader").style.display = "none";
+    }).catch((e) => {
+      console.error(e);
+      document.getElementById("custom-loader").innerHTML = `
+        <div style="text-align: center; color: #dc3545;">
+            <h3>⚠️ Initialization Error</h3>
+            <p>${e.message}</p>
+            <p style="font-size: 0.8rem; margin-top: 10px;">Check browser console for details.</p>
+        </div>
+      `;
     });
   </script>
 </body>
