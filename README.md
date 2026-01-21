@@ -54,11 +54,11 @@ InsightBridge leverages a modern "Serverless AI" architecture:
 
 ```mermaid
 graph TD
-    User[User Browser]
-    WASM[WebAssembly Runtime (Pyodide)]
-    App[Streamlit App]
-    Data[Local CSV Data]
-    OpenAI[OpenAI API (Optional)]
+    User["User Browser"]
+    WASM["WebAssembly Runtime (Pyodide)"]
+    App["Streamlit App"]
+    Data["Local CSV Data"]
+    OpenAI["OpenAI API (Optional)"]
 
     User -->|Loads App| WASM
     WASM -->|Runs| App
