@@ -58,7 +58,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.53.0/build/stlite.js"></script>
   <script>
     stlite.mount({
-      requirements: ["streamlit", "pandas", "plotly", "numpy", "toml"],
+      requirements: ["streamlit", "pandas", "plotly", "numpy"],
       entrypoint: "app.py",
       files: {
         "app.py": {
@@ -81,9 +81,6 @@
         },
         "assets/style.css": {
           url: "assets/style.css"
-        },
-        ".streamlit/config.toml": {
-          url: ".streamlit/config.toml"
         }
       },
       streamlitConfig: {
