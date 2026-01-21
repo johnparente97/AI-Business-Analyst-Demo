@@ -2,21 +2,23 @@ import pandas as pd
 import streamlit as st
 import io
 
+@st.cache_data
 def load_csv(uploaded_file):
     """
     Loads CSV and returns a pandas DataFrame.
     """
     try:
-        if isinstance(uploaded_file, str):
-            # For testing or if path is passed
-            df = pd.read_csv(uploaded_file)
-        else:
-            # For Streamlit file uploader
+        # Check if it's an uploaded file (has seek) or string
+        if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
-            df = pd.read_csv(uploaded_file)
+            
+        df = pd.read_csv(uploaded_file)
         
         # Basic cleanup: Standardize headers
         df.columns = [c.strip() for c in df.columns]
+        
+        # Optimization: Downcast floats/ints if possible (optional, good for huge files)
+        # For now, just ensuring it's efficient
         
         return df
     except Exception as e:

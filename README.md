@@ -1,46 +1,99 @@
-# AI Business Analyst Demo (InsightBridge)
+# 🌉 InsightBridge AI
+**The Executive AI Business Analyst.**
 
-**[🚀 Launch App Now (Live Demo)](https://johnparente97.github.io/AI-Business-Analyst-Demo/)**  
-*(Serverless AI Analytics running entirely in your browser)*
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Launch%20App-0F52BA?style=for-the-badge)](https://johnparente97.github.io/AI-Business-Analyst-Demo/)
 
----
-
-## 💡 How to Use
-Once you click the link above:
-1.  **Upload**: Drag & drop any CSV file (Sales, Financials, etc.).
-2.  **Chat**: Ask questions like *"What are the risks?"* or click **Surprise Me**.
-3.  **Report**: Click **Generate Executive Summary** for a board-ready view.
+**InsightBridge** is a serverless, privacy-first AI analytics tool that turns raw CSV data into board-ready strategic insights. It runs entirely in your browser using WebAssembly (`st-lite`), ensuring your sensitive financial data never leaves your device unless you explicitly connect your own AI model.
 
 ---
 
-## 🤖 What does this app do?
-**InsightBridge AI** acts as an on-demand business data analyst. Instead of writing SQL queries or building complex dashboards, you simply upload your raw data and have a conversation with it.
+## 🎯 Key Capabilities
 
-It automatically:
-*   **Analyzes Trends**: Detects growth patterns, seasonality, and anomalies.
-*   **Identifies Risks**: Highlights potential issues like churn or cost spikes.
-*   **Visualizes Answers**: Generates interactive charts instantly to back up its insights.
-*   **Drafts Reports**: Creates professional executive summaries in seconds.
+*   **🔒 Privacy-First Architecture**: Powered by `st-lite`, the Python backend runs inside your browser. Your data is processed locally in memory.
+*   **🤖 Hybrid AI Engine**:
+    *   **Demo Mode (Default)**: Uses a sophisticated heuristic engine to simulate AI insights for zero-cost testing.
+    *   **Real AI Mode**: Connect your own **OpenAI API Key** to unlock GPT-4o powered analysis on your live data. keys are ephemeral and never stored.
+*   **📊 Dynamic Visualization**: Automatically detects trends, distributions, and comparisons to generate interactive Plotly charts.
+*   **📋 Executive Reporting**: One-click generation of "Board Ready" summaries, highlighting risks, opportunities, and strategic 30-60-90 day plans.
+*   **💬 Natural Language Interface**: Chat with your data as if you were speaking to a Senior Analyst.
 
-## ⚙️ How does it work?
-This application is unique because it is **Serverless & Secure**.
-*   **Client-Side Execution**: It uses `st-lite` (WebAssembly) to run Python, Pandas, and Plotly entirely inside your web browser. Your data **never leaves your computer**.
-*   **AI Simulation**: For this demo, it uses a mock inference engine that simulates the structure of advanced LLM reasoning, ensuring zero latency and zero cost while demonstrating the UX patterns of a real AI product.
-*   **Dynamic UI**: The interface is built with Streamlit but heavily customized with CSS to provide a premium "SaaS" feel.
+---
 
-## 🏗️ Host It Yourself (GitHub Pages)
-Want your own copy?
-1.  **Fork** this repository.
-2.  Go to **Settings > Pages**.
-3.  Select Source: **`main` / `root`**.
-4.  Wait 3 minutes. Your app is live!
+## 🚀 Quick Start
 
-### Troubleshooting
-- **404 Error?** Ensure repo is **Public** and contains the `.nojekyll` file.
+### Option 1: Live Browser Demo (Recommended)
+1.  Click the **[Live Demo](https://johnparente97.github.io/AI-Business-Analyst-Demo/)** button.
+2.  Wait ~30s for the WebAssembly environment to boot (subsequent loads are instant).
+3.  Upload any standard CSV (e.g., Sales Data, Financial Assessment, User Growth).
+4.  *Optional*: Enter your OpenAI API Key in the sidebar for real intelligence.
 
-## 🛠️ Local Development
+### Option 2: Local Development
+If you want to modify the code or run it locally:
+
 ```bash
+# 1. Clone the repository
 git clone https://github.com/johnparente97/AI-Business-Analyst-Demo.git
+cd AI-Business-Analyst-Demo
+
+# 2. Create a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
+
+# 4. Run the app
 streamlit run app.py
 ```
+
+---
+
+## 🏗️ Architecture & Security
+
+InsightBridge leverages a modern "Serverless AI" architecture:
+
+```mermaid
+graph TD
+    User[User Browser]
+    WASM[WebAssembly Runtime (Pyodide)]
+    App[Streamlit App]
+    Data[Local CSV Data]
+    OpenAI[OpenAI API (Optional)]
+
+    User -->|Loads App| WASM
+    WASM -->|Runs| App
+    App -->|Processes| Data
+    
+    subgraph Browser Sandbox
+        WASM
+        App
+        Data
+    end
+    
+    App -->|Requests (Only if Key provided)| OpenAI
+```
+
+*   **Zero-Data Retention**: Data loaded into the app exists only in your browser's RAM (volatile memory). Refreshing the page wipes the data.
+*   **Client-Side Processing**: All filtering, aggregation, and chart generation happens locally.
+*   **API Security**: If you provide an OpenAI Key, it is used strictly for making direct requests to OpenAI endpoints from your browser. It is not managed, saved, or logged by any middleman server.
+
+---
+
+## 🔧 Troubleshooting
+
+**"App is stuck on 'Initializing'..."**
+*   This usually requires a **Hard Refresh** (`Cmd+Shift+R` or `Ctrl+F5`) to clear old cache.
+*   Ensure you are using a modern browser (Chrome, Edge, Firefox, Safari).
+
+**"API Key Invalid"**
+*   Ensure your OpenAI key has active credits and permissions for `gpt-4o-mini`.
+
+---
+
+## ⚖️ Ethical AI & Disclaimer
+This tool uses Large Language Models (LLMs) to generate insights. While powerful, LLMs can occasionally hallucinate or misinterpret numerical data. Always verify critical financial figures against the raw data preview provided in the dashboard.
+
+---
+
+**Built with ❤️ by John Parente**
+*Optimized for Performance & Design.* app.py

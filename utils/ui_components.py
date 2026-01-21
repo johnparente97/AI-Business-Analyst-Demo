@@ -1,30 +1,20 @@
 import streamlit as st
 
-def render_metric_card(label, value, help_text=None):
+def render_metric_card(label, value, help_text=None, delta=None):
     """
-    Renders a styled metric card.
+    Renders a styled metric card using Streamlit native metric for better mobile support,
+    wrapped in a custom container class.
     """
-    st.markdown(f"""
-    <div class="stCard" style="padding: 1rem; text-align: center;">
-        <div class="metric-label">{label}</div>
-        <div class="metric-value">{value}</div>
-        {f'<div style="font-size: 0.8rem; color: #888;">{help_text}</div>' if help_text else ''}
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_chat_message(role, content):
-    """
-    Renders a chat message with appropriate styling.
-    """
-    if role == "user":
-        st.markdown(f'<div class="chat-bubble-user">{content}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="chat-bubble-ai">{content}</div>', unsafe_allow_html=True)
+    with st.container():
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.metric(label=label, value=value, delta=delta, help=help_text)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_dataframe_preview(df):
     """
-    Renders a clean preview of the dataframe.
+    Renders a clean preview of the dataframe in an expander.
     """
-    st.markdown("### Data Preview")
-    st.dataframe(df.head(), use_container_width=True)
+    with st.expander("📊 Data Preview & Statistics", expanded=True):
+        st.dataframe(df.head(10), use_container_width=True)
+        st.caption(f"Showing first 10 rows of {len(df)} total entries.")
 
