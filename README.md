@@ -95,5 +95,4 @@ This tool uses Large Language Models (LLMs) to generate insights. While powerful
 
 ---
 
-**Built with ❤️ by John Parente**
 *Optimized for Performance & Design.* app.py
