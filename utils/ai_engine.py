@@ -1,150 +1,97 @@
 import pandas as pd
-import numpy as np
-import time
-import json
 import requests
 import streamlit as st
+import time
 
 class AIEngine:
-    def __init__(self, api_key=None):
-        self.api_key = api_key
-        self.api_url = "https://api.openai.com/v1/chat/completions"
+    def __init__(self):
+        # Retrieve API Token from Streamlit Secrets
+        # User instructions: Add [HF_API_TOKEN] to .streamlit/secrets.toml for deployed apps
+        self.api_token = st.secrets.get("HF_API_TOKEN", None)
+        self.api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
 
-    def analyze(self, query, df):
+    def generate_executive_summary(self, df, summary_stats):
         """
-        Main entry point for AI analysis.
-        Decides whether to use Real AI or Mock AI based on API Key presence.
+        Generates a concise executive summary based on the dataset.
         """
-        if self.api_key and self.api_key.startswith("sk-"):
-            try:
-                return self._call_openai(query, df)
-            except Exception as e:
-                # Fail gracefully to mock engine
-                st.toast(f"⚠️ API Error ({type(e).__name__}). Switching to Demo Mode.", icon="🛡️")
-                print(f"OpenAI Error: {e}")
-                return self._generate_mock_response(query, df)
-        else:
-            return self._generate_mock_response(query, df)
-
-    def _call_openai(self, query, df):
-        """
-        Calls OpenAI API via requests for browser compatibility (st-lite).
-        """
-        # Prepare data context (lite version)
-        data_preview = df.head(5).to_markdown(index=False)
-        columns = ", ".join(df.columns)
+        # Prepare the context for the LLM
+        context = self._prepare_context(df, summary_stats)
         
-        system_prompt = f"""
-        You are InsightBridge, an expert AI Business Analyst. 
-        Your goal is to answer the user's business question based on the provided dataset.
+        if self.api_token:
+            try:
+                return self._call_huggingface(context)
+            except Exception as e:
+                # Log error (console) but degrade gracefully
+                print(f"HF API Error: {e}")
+                return self._generate_fallback_summary(summary_stats)
+        else:
+            # No token provided, use deterministic fallback immediately
+            return self._generate_fallback_summary(summary_stats)
+
+    def _prepare_context(self, df, summary_stats):
+        """
+        Creates a prompt string from the dataframe stats.
+        """
+        columns = ", ".join(df.columns[:10]) # Limit columns for context window
+        numeric_desc = df.describe().to_markdown() if not df.empty else "No numeric data"
+        
+        prompt = f"""
+        [INST] You are a Senior Business Analyst. 
+        Analyze the following dataset summary and write a short, executive-style report.
         
         DATA CONTEXT:
         - Columns: {columns}
-        - Sample Data:
-        {data_preview}
-        
-        RESPONSE FORMAT:
-        Return a valid JSON object with the following structure:
-        {{
-            "content": "Markdown formatted analysis. Use bullet points for key insights, risks, and recommended actions.",
-            "chart_type": "trend" | "bar" | "distribution" | null
-        }}
-        
-        RULES:
-        1. Be professional, concise, and executive.
-        2. Identify the best chart type to visualize the answer (if applicable).
-        3. Do not mention that you are an AI or looking at a sample.
+        - Total Rows: {summary_stats['rows']}
+        - Date Range: {summary_stats['date_range']}
+        - Key Statistics:
+        {numeric_desc}
+
+        INSTRUCTIONS:
+        1. Write a 3-bullet point "Key Insights" section.
+        2. Write a 2-bullet point "Risks & Opportunities" section.
+        3. Be professional, concise, and direct. 
+        4. Do NOT mention you are an AI or looking at a summary.
+        [/INST]
         """
-        
+        return prompt
+
+    def _call_huggingface(self, prompt):
+        headers = {"Authorization": f"Bearer {self.api_token}"}
         payload = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query}
-            ],
-            "temperature": 0.7,
-            "response_format": {"type": "json_object"}
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 512,
+                "temperature": 0.3,
+                "return_full_text": False
+            }
         }
         
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        response = requests.post(self.api_url, headers=headers, json=payload, timeout=10)
+        response = requests.post(self.api_url, headers=headers, json=payload, timeout=20)
         response.raise_for_status()
         
+        # Parse output
         result = response.json()
-        content_str = result['choices'][0]['message']['content']
-        parsed = json.loads(content_str)
-        
-        return parsed
-
-    def _generate_mock_response(self, query, df):
-        """
-        Highly realistic mock engine for demo purposes using keyword heuristics.
-        """
-        time.sleep(0.1) # Minimal delay for UI feel
-        
-        q = query.lower()
-        
-        # Dynamic extraction if possible
-        row_count = len(df)
-        
-        response = {
-            "content": "",
-            "chart_type": None
-        }
-        
-        if "trend" in q or "over time" in q:
-            response["chart_type"] = "trend"
-            response["content"] = f"""
-### 📈 Trend Analysis
-**Key Insight:** Analysis of the {row_count} records shows a significant upward trajectory in the primary metrics over the reported period.
-
-*   **Growth:** Consistent month-over-month growth of **~8.5%**.
-*   **Seasonality:** Data indicates peak activity during Q3.
-*   **Volatility:** Low variance suggests a stable operational baseline.
-
-**Recommendation:** Capitalize on the Q3 momentum by increasing inventory or resource allocation 30 days prior.
-            """
-            
-        elif "risk" in q or "worry" in q or "issue" in q:
-            response["chart_type"] = "distribution"
-            response["content"] = """
-### ⚠️ Risk Assessment
-**Critical Finding:** Detected anomalies in the lower quartile of the performance distribution.
-
-*   **Churn Risk:** Engagement metrics for the 'Basic' tier have declined by **5%**.
-*   **Cost Efficiency:** Operational overhead has increased slightly faster than revenue in the last cycle.
-
-**Action Required:**
-1.  Audit expense reports for the last 30 days.
-2.  Launch a retention campaign targeting the 'Basic' cohort immediately.
-            """
-            
-        elif "best" in q or "grow" in q or "opportunity" in q:
-            response["chart_type"] = "bar"
-            response["content"] = """
-### 🌱 Growth Opportunities
-**Top Performer:** The 'Enterprise' segment is outperforming all others, contributing **40% of total value** despite being only 15% of volume.
-
-*   **Conversion:** Mobile traffic conversion rate is **2x** higher than desktop.
-*   **Untapped Market:** Regional data shows under-penetration in the West Coast market.
-
-**Strategic Move:** Shift ad spend to prioritize mobile-first creatives and double down on Enterprise sales enablement.
-            """
-            
+        if isinstance(result, list) and len(result) > 0:
+            return result[0].get('generated_text', '').strip()
         else:
-            response["content"] = f"""
-### 📊 General Analysis
-I've analyzed the dataset containing **{row_count} rows** and **{len(df.columns)} columns**.
+            raise ValueError("Unexpected API response structure")
 
-*   **Data Health:** The data appears consistent with high fill rates.
-*   **Correlations:** Strong correlation observed between volume metrics and total value.
-
-To get more specific insights, try asking about **Trends**, **Risks**, or **Top Performers**.
-            """
-            
-        return response
+    def _generate_fallback_summary(self, summary_stats):
+        """
+        Deterministic template fallback if API fails or no token.
+        """
+        time.sleep(1) # Simulate thinking
+        
+        return f"""
+        ### 📊 Automated Executive Summary
+        
+        **Key Insights**
+        *   **Volume:** The dataset contains **{summary_stats['rows']}** records, providing a substantial sample for analysis.
+        *   **Structure:** There are **{summary_stats['cols']}** variables tracked, indicating a multi-dimensional dataset.
+        *   **Data Quality:** We detected **{summary_stats['missing_values']}** missing values that may require attention during detailed auditing.
+        
+        **Risks & Recommendations**
+        *   **Completeness:** Ensure all key fields are popularized to maximize analysis accuracy.
+        *   **Next Steps:** We recommend drilling down into specific time periods (currently covering {summary_stats['date_range']}) to identify seasonal trends.
+        """
 

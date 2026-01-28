@@ -1,217 +1,148 @@
 import streamlit as st
 import pandas as pd
-import utils.ui_components as ui
 import utils.data_loader as dl
-from utils.ai_engine import AIEngine
 import utils.chart_generator as cg
+from utils.ai_engine import AIEngine
 
-
-# Patch requests for Pyodide (stlite) environment
-import sys
-if "pyodide" in sys.modules:
-    try:
-        import pyodide_http
-        pyodide_http.patch_all()
-    except ImportError:
-        pass # Should be handled by requirements, but safe fail
-
-# Page Configuration
+# -----------------
+# 1. Config & Style
+# -----------------
 st.set_page_config(
     page_title="InsightBridge AI",
     page_icon="🌉",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Load Custom CSS
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-try:
-    local_css("assets/style.css")
-except FileNotFoundError:
-    pass # CSS might be handled by index.html in dev
-
-# Session State Initialization
-if 'data_frame' not in st.session_state:
-    st.session_state['data_frame'] = None
-if 'chat_history' not in st.session_state:
-    st.session_state['chat_history'] = []
-if 'show_executive_summary' not in st.session_state:
-    st.session_state['show_executive_summary'] = False
-
-# Sidebar Configuration
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/4712/4712035.png", width=50)
-    st.title("InsightBridge")
-    st.markdown("---")
+# Modern UI Styling
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     
-    st.markdown("### ⚙️ Settings")
-    api_key = st.text_input("OpenAI API Key (Optional)", type="password", help="Enter your key for real insights. Leave empty for Demo Mode.")
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
     
-    if api_key:
-        st.success("Real AI Enabled ✅")
-    else:
-        st.info("Using Demo Mode 🟢")
-        
-    st.markdown("---")
-    if st.button("🔄 Reset Demo", use_container_width=True):
-        st.session_state['data_frame'] = None
-        st.session_state['chat_history'] = []
-        st.session_state['show_executive_summary'] = False
-        st.rerun()
+    .block-container {
+        padding-top: 3rem;
+        padding-bottom: 5rem;
+    }
+    
+    /* Card Styling */
+    .stMetric {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* Dark mode adjustment for cards */
+    @media (prefers-color-scheme: dark) {
+        .stMetric {
+            background-color: #262730;
+            box-shadow: 0 2px 5px rgba(255,255,255,0.05);
+        }
+    }
+    
+    h1, h2, h3 {
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("Made with ❤️ by John Parente")
-
-# Main Logic
+# -----------------
+# 2. Main Logic
+# -----------------
 def main():
-    # Initialize AI Engine with Key
-    ai_engine = AIEngine(api_key=api_key)
-
-    if st.session_state['data_frame'] is None:
-        render_landing_page()
-    else:
-        render_dashboard_view(ai_engine)
-
-def render_landing_page():
-    st.markdown('<div class="hero-container">', unsafe_allow_html=True)
-    st.markdown('<h1 class="hero-title">InsightBridge AI</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="hero-subtitle">Turn your clean data into clear direction.<br>Drop a CSV below to start analyzing.</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # Header
+    col1, col2 = st.columns([0.1, 0.9])
+    with col1:
+        st.write("## 🌉")
     with col2:
-        uploaded_file = st.file_uploader("Upload CSV (Sales, Financials, etc.)", type="csv")
-        if uploaded_file is not None:
-            with st.spinner("Processing Data..."):
-                df = dl.load_csv(uploaded_file)
-                if df is not None:
-                    st.session_state['data_frame'] = df
-                    st.toast("Data Loaded Successfully!", icon="🚀")
-                    st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def render_dashboard_view(ai_engine):
-    st.title("📊 Executive Dashboard")
+        st.title("InsightBridge AI")
     
-    df = st.session_state['data_frame']
+    st.markdown("### Executive Business Analytics")
+    st.markdown("Upload your dataset to instantly generate clear summaries, visual trends, and strategic insights.")
+    st.markdown("---")
+
+    # File Upload
+    uploaded_file = st.file_uploader("📂 Upload CSV Data", type=["csv"], help="Max 200MB")
+    
+    if uploaded_file is None:
+        render_landing_info()
+    else:
+        with st.spinner("Processing Data..."):
+            df = dl.load_csv(uploaded_file)
+            
+        if df is not None:
+            render_dashboard(df)
+
+def render_landing_info():
+    st.info("👋 **Welcome!** Drag and drop a CSV file above to begin. No API keys or setup required.")
+    
+    st.markdown("""
+    #### What you get:
+    *   **Auto-Diagnostics**: Detects rows, columns, and numeric trends.
+    *   **Visual Intelligence**: Automatically generates relevant charts.
+    *   **Executive Summary**: AI-powered analysis of your business context.
+    """)
+
+def render_dashboard(df):
+    # 1. Calculate Stats
     summary = dl.get_data_summary(df)
     
-    # Top Metrics
-    c1, c2, c3, c4 = st.columns(4)
+    # 2. Top Level Metrics
+    m1, m2, m3, m4 = st.columns(4)
     if summary:
-        ui.render_metric_card("Total Rows", summary['rows'])
-        ui.render_metric_card("Variables", summary['cols'])
-        ui.render_metric_card("Missing Values", summary['missing_values'])
-        ui.render_metric_card("Date Range", summary['date_range'])
+        m1.metric("Rows", f"{summary['rows']:,}")
+        m2.metric("Variables", summary['cols'])
+        m3.metric("Missing Values", summary['missing_values'])
+        m4.metric("Date Range", summary['date_range'])
     
     st.markdown("---")
     
-    # Main Workspace
-    tab1, tab2 = st.tabs(["💬 Chat & Insights", "📋 Executive Report"])
+    # 3. Visualizations (Auto-Generated)
+    c1, c2 = st.columns(2)
     
-    with tab1:
-        col_chat_vis, col_data_prev = st.columns([2, 1])
-        
-        with col_chat_vis:
-            st.markdown("### 🤖 Ask your Data")
-            
-            # Chat Container
-            chat_box = st.container(height=400)
-            
-            with chat_box:
-                if not st.session_state['chat_history']:
-                    st.info("👋 Hi! I'm your AI Analyst. Ask me about **trends**, **risks**, or **opportunities**.")
-                
-                for msg in st.session_state['chat_history']:
-                    with st.chat_message(msg['role']):
-                        st.markdown(msg['content'])
-                        if "chart" in msg and msg["chart"]:
-                            st.plotly_chart(msg["chart"], use_container_width=True)
+    with c1:
+        # Trend Chart (if dates exist)
+        fig_trend = cg.create_trend_chart(df, title="📈 Key Trends Over Time")
+        if fig_trend:
+            st.plotly_chart(fig_trend, use_container_width=True)
+        else:
+            st.warning("No date column detected for trend analysis.")
 
-            # Input Action
-            query = st.chat_input("Ask a question about your business...")
-            
-            if query:
-                # User Message
-                st.session_state['chat_history'].append({"role": "user", "content": query})
-                with chat_box:
-                    with st.chat_message("user"):
-                        st.markdown(query)
-                
-                # AI Message
-                with chat_box:
-                    with st.chat_message("assistant"):
-                        with st.spinner("Analyzing..."):
-                            response = ai_engine.analyze(query, df)
-                            
-                            st.markdown(response['content'])
-                            
-                            chart_fig = None
-                            if response.get('chart_type'):
-                                if response['chart_type'] == 'trend':
-                                    chart_fig = cg.create_trend_chart(df)
-                                elif response['chart_type'] == 'distribution':
-                                    chart_fig = cg.create_distribution_chart(df)
-                                elif response['chart_type'] == 'bar':
-                                    chart_fig = cg.create_bar_chart(df)
-                                
-                                if chart_fig:
-                                    st.plotly_chart(chart_fig, use_container_width=True)
-                            
-                            # Save history
-                            msg_data = {"role": "assistant", "content": response['content']}
-                            if chart_fig:
-                                msg_data["chart"] = chart_fig
-                            st.session_state['chat_history'].append(msg_data)
-
-        with col_data_prev:
-            ui.render_dataframe_preview(df)
-            st.markdown("### 💡 Suggestions")
-            if st.button("📈 Analyze Trends", use_container_width=True):
-                # Trigger via simulation logic or just a quick method
-                pass # Use chat input flow naturally
-            
-            if st.button("⚠️ Identify Risks", use_container_width=True):
-                pass
-            
-            if st.button("🎲 Surprise Me", use_container_width=True):
-                pass
-                
-    with tab2:
-        if st.button("Generate New Report", type="primary"):
-            with st.spinner("Compiling Board Report..."):
-                st.session_state['show_executive_summary'] = True
+    with c2:
+        # Distribution or Comparison
+        fig_dist = cg.create_bar_chart(df, title="📊 Category Performance")
+        if not fig_dist:
+             fig_dist = cg.create_distribution_chart(df, title="🔢 Numeric Distribution")
         
-        if st.session_state['show_executive_summary']:
-             st.markdown("""
-            <div class="metric-card">
-                <h2 style="color: #2c3e50; margin-bottom: 0;">🚀 Executive Summary</h2>
-                <p style="color: #7f8c8d; font-size: 0.9rem;">Generated Automatically by InsightBridge</p>
-                <hr style="margin: 1rem 0;">
-                
-                <h4 style="color: #0F52BA;">Key Intelligence</h4>
-                <ul>
-                    <li><strong>Revenue Growth:</strong> +12% YoY driven by Q3 marketing push.</li>
-                    <li><strong>Customer Segments:</strong> Mobile users now account for 65% of traffic.</li>
-                    <li><strong>Efficiency:</strong> Inventory holding costs reduced by 5% this quarter.</li>
-                </ul>
-                
-                <h4 style="color: #d63031;">Risk Matrix</h4>
-                <ul>
-                    <li><strong>Churn Alert:</strong> User retention dropped 2% in the last 30 days.</li>
-                    <li><strong>Dependency:</strong> 40% of revenue tied to top 2 product lines.</li>
-                </ul>
-                
-                <h4 style="color: #27ae60;">Strategic Roadmap (Recommended)</h4>
-                <ul>
-                    <li><strong>Immediate:</strong> Launch win-back campaign for at-risk users.</li>
-                    <li><strong>Mid-Term:</strong> Optimize mobile checkout flow for higher conversion.</li>
-                    <li><strong>Long-Term:</strong> Diversify product catalog to mitigate dependency risk.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+        if fig_dist:
+            st.plotly_chart(fig_dist, use_container_width=True)
+        else:
+            st.info("Could not auto-detect simple categories or numeric distributions.")
+
+    st.markdown("---")
+
+    # 4. AI Executive Summary
+    st.header("📝 Executive Analysis")
+    
+    # Initialize engine
+    ai = AIEngine()
+    
+    # Generate content
+    # We use a container to clearly update after thinking
+    analysis_container = st.container()
+    
+    with analysis_container:
+        with st.spinner("🤖 Analyzing business implications..."):
+            try:
+                # Pass df and summary statistics to AI
+                obs = ai.generate_executive_summary(df, summary)
+                st.markdown(obs)
+            except Exception as e:
+                st.error(f"Analysis failed: {e}")
 
 if __name__ == "__main__":
     main()

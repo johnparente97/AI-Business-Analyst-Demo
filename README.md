@@ -1,70 +1,64 @@
-# 🌉 InsightBridge AI (Browser-Based)
+# InsightBridge AI 🌉
 
-**A Serverless, Privacy-First Business Analytics Tool.**
+> **Free, open-source–powered executive analytics.**
 
-[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Launch%20App-0F52BA?style=for-the-badge)](https://johnparente97.github.io/AI-Business-Analyst-Demo/)
+InsightBridge is a streamlined business intelligence tool that turns raw CSV data into executive-style summaries, visual trends, and strategic insights—instantly.
 
-**InsightBridge** runs a full Python Streamlit application **entirely in your web browser** using WebAssembly ([Pyodide](https://pyodide.org/) + [st-lite](https://github.com/whitphx/stlite)).
-
-## ⚠️ Architectural Reality
-Unlike standard web apps, **there is no backend server**.
-*   **Privacy**: Your CSV data never leaves your device. It is loaded into your browser's RAM.
-*   **Security**: API Keys (if used) are sent directly from your browser to OpenAI. They are not stored or proxied.
-*   **Performance**: The first load requires downloading the Python runtime (~20-50MB), which may take 10-20 seconds. Subsequent loads are faster due to browser caching.
+**[Try the Demo](https://insightbridge.streamlit.app)** _(Replace with your actual link)_
 
 ---
 
-## 🛠 Features vs. Limitations
+## 🚀 Features
 
-| Feature | Status | Note |
-| :--- | :--- | :--- |
-| **Data Analysis** | ✅ Local | Pandas/Numpy run in-browser via WASM. |
-| **Interactive Charts** | ✅ Local | Plotly renders client-side. |
-| **Demo Intelligence** | ✅ Local | Heuristic engine works offline (Zero cost). |
-| **Real AI Intelligence** | ⚠️ Optional | Requires **OpenAI API Key**. Calls are made directly via browser fetch. |
-| **History & Saving** | ❌ None | **Refreshing the page wipes all data.** (Transient Memory) |
+*   **Instant Analysis**: strict "No Setup" flow. Just drag and drop your CSV.
+*   **Executive Focus**: Generates high-level summaries, risks, and strategic opportunities.
+*   **Secure & Private**: Runs entirely in the cloud (or locally). No data persists after the session.
+*   **Visual Intelligence**: Auto-detects time-series and categorical data to generate Plotly charts.
+*   **Open Source AI**: Powered by Hugging Face Inference API (Mistral-7B / Llama-3).
 
----
+## 🛠️ How to Run
 
-## 🚀 How to Run
+### 1. Cloud (Recommended)
+Deploy directly to **Streamlit Community Cloud**:
+1.  Fork this repository.
+2.  Connect to Streamlit Cloud.
+3.  Add your Hugging Face Token to **Secrets**:
+    ```toml
+    # .streamlit/secrets.toml
+    HF_API_TOKEN = "hf_..."
+    ```
+4.  Deploy!
 
-### Option 1: Live (GitHub Pages)
-1.  Click **[Launch App](https://johnparente97.github.io/AI-Business-Analyst-Demo/)**.
-2.  **Wait**: You will see a "Booting Secure Environment" screen. **Do not refresh.**
-3.  Once loaded, upload a CSV (Max 5MB).
-
-### Option 2: Local Development
-To modify the code, you can run it as a standard Streamlit app:
-
+### 2. Local Development
 ```bash
-# 1. Clone
+# Clone
 git clone https://github.com/johnparente97/AI-Business-Analyst-Demo.git
 cd AI-Business-Analyst-Demo
 
-# 2. Install (Python 3.9+ recommended)
-python -m venv .venv
-source .venv/bin/activate
+# Install Dependencies
 pip install -r requirements.txt
 
-# 3. Run
+# Run
 streamlit run app.py
 ```
 
-*Note: In local mode, standard Python is used, not WebAssembly.*
+## 🔒 Configuration
+
+The app requires a **Hugging Face Access Token** for the AI generation to work securely.
+If no token is provided, the app gracefully degrades to **Deterministic Mode**, providing heuristic-based templates instead of live LLM generation.
+
+1.  Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+2.  Set it in `.streamlit/secrets.toml` (locally) or Streamlit Cloud Secrets (deployed).
+
+## 📦 Project Structure
+
+*   `app.py`: Main application entry point. Single-flow logic.
+*   `utils/`:
+    *   `data_loader.py`: Safe CSV handling and statistical profiling.
+    *   `ai_engine.py`: Handles Hugging Face API calls and prompt engineering.
+    *   `chart_generator.py`: Plotly visualization logic.
+*   `requirements.txt`: Minimal dependency set.
 
 ---
 
-## 🏗️ Technical Stack
-
-*   **Runtime**: Python 3.11 (via Pyodide WASM kernel)
-*   **Framework**: Streamlit / st-lite
-*   **Hosting**: GitHub Pages (Static HTML/JS)
-*   **Networking**: `pyodide-http` patches `requests` for browser context.
-
-### Known Issues
-*   **Mobile Mobile**: Heavy WASM usage can crash mobile browser tabs on low-RAM devices. Desktop recommended.
-*   **CORS**: OpenAI API calls work because `pyodide-http` proxies requests or the browser handles them, but strict corporate firewalls may block direct API usage.
-
----
-
-**built by John Parente** | *Architecture > Marketing*
+**Designed for Simplicity, Reliability, and Speed.**
