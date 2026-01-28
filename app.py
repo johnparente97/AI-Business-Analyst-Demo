@@ -23,7 +23,7 @@ st.markdown("""
     }
     
     .block-container {
-        padding-top: 3rem;
+        padding-top: 2rem;
         padding-bottom: 5rem;
     }
     
@@ -47,6 +47,10 @@ st.markdown("""
         font-weight: 700;
         letter-spacing: -0.5px;
     }
+    
+    .stAlert {
+        padding: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,84 +66,90 @@ def main():
         st.title("InsightBridge AI")
     
     st.markdown("### Executive Business Analytics")
-    st.markdown("Upload your dataset to instantly generate clear summaries, visual trends, and strategic insights.")
+    st.markdown("Upload large datasets (up to 200MB) for instant processing, aggregation, and AI-driven strategic insights.")
     st.markdown("---")
 
     # File Upload
-    uploaded_file = st.file_uploader("📂 Upload CSV Data", type=["csv"], help="Max 200MB")
+    uploaded_file = st.file_uploader("📂 Upload CSV Data", type=["csv"], help="Optimized for files up to 200MB")
     
     if uploaded_file is None:
         render_landing_info()
     else:
-        with st.spinner("Processing Data..."):
-            df = dl.load_csv(uploaded_file)
-            
-        if df is not None:
-            render_dashboard(df)
+        # File Size Check
+        uploaded_file.seek(0, 2)
+        size_mb = uploaded_file.tell() / (1024 * 1024)
+        uploaded_file.seek(0)
+        
+        if size_mb > 200:
+            st.warning(f"⚠️ File size ({size_mb:.1f}MB) exceeds recommended simple analysis limit (200MB). Performance may vary.")
+        
+        # Process Stream
+        if 'summary_data' not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
+            with st.spinner("Processing Dataset..."):
+                summary = dl.process_uploaded_file(uploaded_file)
+                st.session_state['summary_data'] = summary
+                st.session_state['file_name'] = uploaded_file.name
+        
+        if st.session_state.get('summary_data'):
+            render_dashboard(st.session_state['summary_data'])
 
 def render_landing_info():
     st.info("👋 **Welcome!** Drag and drop a CSV file above to begin. No API keys or setup required.")
     
     st.markdown("""
-    #### What you get:
-    *   **Auto-Diagnostics**: Detects rows, columns, and numeric trends.
-    *   **Visual Intelligence**: Automatically generates relevant charts.
-    *   **Executive Summary**: AI-powered analysis of your business context.
+    #### Capabilities:
+    *   **Large File Support**: Efficiently processes up to 200MB CSVs using server-side streaming.
+    *   **Secure & Private**: Raw data is **never** sent to AI models; only anonymous statistical summaries are analyzed.
+    *   **Instant Aggregation**: Automatic calculation of trends, distributions, and data quality metrics.
     """)
 
-def render_dashboard(df):
-    # 1. Calculate Stats
-    summary = dl.get_data_summary(df)
-    
-    # 2. Top Level Metrics
+def render_dashboard(summary):
+    # 1. Top Level Metrics
     m1, m2, m3, m4 = st.columns(4)
     if summary:
-        m1.metric("Rows", f"{summary['rows']:,}")
+        m1.metric("Total Records", f"{summary['rows']:,}")
         m2.metric("Variables", summary['cols'])
-        m3.metric("Missing Values", summary['missing_values'])
-        m4.metric("Date Range", summary['date_range'])
+        m3.metric("Missing Values", f"{summary['total_missing']:,}")
+        m4.metric("Date Period", summary['date_range'])
     
     st.markdown("---")
     
-    # 3. Visualizations (Auto-Generated)
+    # 2. Visualizations (Auto-Generated)
     c1, c2 = st.columns(2)
     
     with c1:
-        # Trend Chart (if dates exist)
-        fig_trend = cg.create_trend_chart(df, title="📈 Key Trends Over Time")
+        # Trend Chart
+        fig_trend = cg.create_trend_chart(summary, title="📈 Activity Trends")
         if fig_trend:
             st.plotly_chart(fig_trend, use_container_width=True)
         else:
-            st.warning("No date column detected for trend analysis.")
+            st.warning("No time-series data detected for trend analysis.")
 
     with c2:
-        # Distribution or Comparison
-        fig_dist = cg.create_bar_chart(df, title="📊 Category Performance")
-        if not fig_dist:
-             fig_dist = cg.create_distribution_chart(df, title="🔢 Numeric Distribution")
+        # Categorical Breakdown
+        fig_cat = cg.create_categorical_chart(summary, title="📊 Primary Category Distribution")
         
-        if fig_dist:
-            st.plotly_chart(fig_dist, use_container_width=True)
+        if fig_cat:
+            st.plotly_chart(fig_cat, use_container_width=True)
         else:
-            st.info("Could not auto-detect simple categories or numeric distributions.")
+            st.info("Could not detect significant categorical distributions.")
 
     st.markdown("---")
 
-    # 4. AI Executive Summary
-    st.header("📝 Executive Analysis")
+    # 3. AI Executive Summary
+    st.header("📝 Executive Strategic Analysis")
     
     # Initialize engine
     ai = AIEngine()
     
     # Generate content
-    # We use a container to clearly update after thinking
     analysis_container = st.container()
     
     with analysis_container:
-        with st.spinner("🤖 Analyzing business implications..."):
+        with st.spinner("🤖 synthesizing strategic insights (this may take a moment)..."):
             try:
-                # Pass df and summary statistics to AI
-                obs = ai.generate_executive_summary(df, summary)
+                # Pass summary statistics to AI
+                obs = ai.generate_executive_summary(summary)
                 st.markdown(obs)
             except Exception as e:
                 st.error(f"Analysis failed: {e}")

@@ -1,64 +1,41 @@
 # InsightBridge AI 🌉
 
-> **Free, open-source–powered executive analytics.**
+**Scalable. Secure. Strategic.**
 
-InsightBridge is a streamlined business intelligence tool that turns raw CSV data into executive-style summaries, visual trends, and strategic insights—instantly.
+InsightBridge AI is an advanced business analytics platform designed to instantly turn raw data into executive-level insights. It bridges the gap between complex datasets and clear, actionable strategy.
 
-**[Try the Demo](https://insightbridge.streamlit.app)** _(Replace with your actual link)_
+## 🚀 Key Capabilities
 
----
+*   **Large Dataset Support**: Process CSV files up to **200MB** effortlessly. The app uses advanced server-side streaming technology to handle large data without crashing your browser.
+*   **Privacy-First AI**: We use a **Safe-Partition Architecture**. Your raw confidential data never leaves the secure processing environment. Only anonymous, high-level statistical summaries are sent to the AI for interpretation.
+*   **Instant Diagnostics**: Automatically detects time-series patterns, categorical distributions, and data quality issues (missing values, outliers).
+*   **Executive Analysis**: Generates professional strategic briefs highlighting risks, opportunities, and key trends.
 
-## 🚀 Features
+## 🛠️ Technology Stack
 
-*   **Instant Analysis**: strict "No Setup" flow. Just drag and drop your CSV.
-*   **Executive Focus**: Generates high-level summaries, risks, and strategic opportunities.
-*   **Secure & Private**: Runs entirely in the cloud (or locally). No data persists after the session.
-*   **Visual Intelligence**: Auto-detects time-series and categorical data to generate Plotly charts.
-*   **Open Source AI**: Powered by Hugging Face Inference API (Mistral-7B / Llama-3).
+*   **Engine**: Python (Streamlit)
+*   **Data Processing**: Pandas (Chunked Streaming)
+*   **Visualization**: Plotly Interactive Charts
+*   **Intelligence**: Hugging Face Inference API (Mistral-7B)
 
-## 🛠️ How to Run
+## 📋 How to Use
 
-### 1. Cloud (Recommended)
-Deploy directly to **Streamlit Community Cloud**:
-1.  Fork this repository.
-2.  Connect to Streamlit Cloud.
-3.  Add your Hugging Face Token to **Secrets**:
+1.  **Upload Data**: Drag and drop any CSV file (up to 200MB).
+2.  **View Dashboard**: Instantly see key metrics, interactive trend lines, and category breakdowns.
+3.  **Read Strategy**: A comprehensive AI-generated report appears at the bottom, synthesizing the data into business language.
+
+### Configuration (Optional)
+To enable the full AI capabilities, you can provide a Hugging Face API Token.
+1.  Create a `.streamlit/secrets.toml` file.
+2.  Add your token:
     ```toml
-    # .streamlit/secrets.toml
     HF_API_TOKEN = "hf_..."
     ```
-4.  Deploy!
+*Note: Without a token, the app runs in "Offline Mode," providing deterministic statistical summaries.*
 
-### 2. Local Development
-```bash
-# Clone
-git clone https://github.com/johnparente97/AI-Business-Analyst-Demo.git
-cd AI-Business-Analyst-Demo
-
-# Install Dependencies
-pip install -r requirements.txt
-
-# Run
-streamlit run app.py
-```
-
-## 🔒 Configuration
-
-The app requires a **Hugging Face Access Token** for the AI generation to work securely.
-If no token is provided, the app gracefully degrades to **Deterministic Mode**, providing heuristic-based templates instead of live LLM generation.
-
-1.  Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
-2.  Set it in `.streamlit/secrets.toml` (locally) or Streamlit Cloud Secrets (deployed).
-
-## 📦 Project Structure
-
-*   `app.py`: Main application entry point. Single-flow logic.
-*   `utils/`:
-    *   `data_loader.py`: Safe CSV handling and statistical profiling.
-    *   `ai_engine.py`: Handles Hugging Face API calls and prompt engineering.
-    *   `chart_generator.py`: Plotly visualization logic.
-*   `requirements.txt`: Minimal dependency set.
+## 🔒 Security Note
+*   **No Data Retention**: Uploaded files are processed in memory and discarded immediately after analysis.
+*   **Sanitized AI Inputs**: The AI model only receives metadata (e.g., "Sales column: Mean=500, Max=1000"), never individual customer records or PII.
 
 ---
-
-**Designed for Simplicity, Reliability, and Speed.**
+*Built for the Modern Data Stack.*
