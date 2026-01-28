@@ -1,5 +1,7 @@
 # InsightBridge AI 🌉
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-business-analyst-demo.streamlit.app)
+
 **Scalable. Secure. Strategic.**
 
 InsightBridge AI is an advanced business analytics platform designed to instantly turn raw data into executive-level insights. It bridges the gap between complex datasets and clear, actionable strategy.
