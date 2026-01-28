@@ -1,5 +1,5 @@
-streamlit
-pandas
-plotly
-openai
-numpy
+streamlit==1.40.1 # Used for local dev only. In browser, provided by stlite.
+pandas==2.2.0
+plotly==5.24.0
+numpy==1.26.0
+pyodide-http==0.2.1

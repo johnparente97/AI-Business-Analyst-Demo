@@ -8,17 +8,20 @@ def load_csv(uploaded_file):
     Loads CSV and returns a pandas DataFrame.
     """
     try:
-        # Check if it's an uploaded file (has seek) or string
-        if hasattr(uploaded_file, "seek"):
-            uploaded_file.seek(0)
-            
+        # Safety: Check file size (limit 5MB for browser stability)
+        MAX_SIZE_MB = 5
+        uploaded_file.seek(0, 2) # Seek to end
+        size = uploaded_file.tell()
+        uploaded_file.seek(0) # Reset
+        
+        if size > MAX_SIZE_MB * 1024 * 1024:
+            st.error(f"⚠️ File too large ({size/1024/1024:.1f}MB). Max limit is {MAX_SIZE_MB}MB for browser performance.")
+            return None
+
         df = pd.read_csv(uploaded_file)
         
         # Basic cleanup: Standardize headers
-        df.columns = [c.strip() for c in df.columns]
-        
-        # Optimization: Downcast floats/ints if possible (optional, good for huge files)
-        # For now, just ensuring it's efficient
+        df.columns = [str(c).strip() for c in df.columns]
         
         return df
     except Exception as e:

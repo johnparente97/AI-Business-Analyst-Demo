@@ -19,7 +19,9 @@ class AIEngine:
             try:
                 return self._call_openai(query, df)
             except Exception as e:
-                st.warning(f"OpenAI API Error: {e}. Falling back to experimental mock engine.")
+                # Fail gracefully to mock engine
+                st.toast(f"⚠️ API Error ({type(e).__name__}). Switching to Demo Mode.", icon="🛡️")
+                print(f"OpenAI Error: {e}")
                 return self._generate_mock_response(query, df)
         else:
             return self._generate_mock_response(query, df)
@@ -82,7 +84,7 @@ class AIEngine:
         """
         Highly realistic mock engine for demo purposes using keyword heuristics.
         """
-        time.sleep(0.6) # Slight branding delay
+        time.sleep(0.1) # Minimal delay for UI feel
         
         q = query.lower()
         

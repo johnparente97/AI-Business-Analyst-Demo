@@ -4,7 +4,16 @@ import utils.ui_components as ui
 import utils.data_loader as dl
 from utils.ai_engine import AIEngine
 import utils.chart_generator as cg
-import time
+
+
+# Patch requests for Pyodide (stlite) environment
+import sys
+if "pyodide" in sys.modules:
+    try:
+        import pyodide_http
+        pyodide_http.patch_all()
+    except ImportError:
+        pass # Should be handled by requirements, but safe fail
 
 # Page Configuration
 st.set_page_config(
@@ -80,7 +89,6 @@ def render_landing_page():
                 if df is not None:
                     st.session_state['data_frame'] = df
                     st.toast("Data Loaded Successfully!", icon="🚀")
-                    time.sleep(1)
                     st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -174,7 +182,6 @@ def render_dashboard_view(ai_engine):
     with tab2:
         if st.button("Generate New Report", type="primary"):
             with st.spinner("Compiling Board Report..."):
-                time.sleep(1) # Polish delay
                 st.session_state['show_executive_summary'] = True
         
         if st.session_state['show_executive_summary']:

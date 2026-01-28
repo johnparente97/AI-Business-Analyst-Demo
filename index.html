@@ -51,14 +51,15 @@
 <body>
   <div id="custom-loader">
     <div class="spinner"></div>
-    <h3>Initializing InsightBridge AI...</h3>
-    <p style="color: #666; font-size: 0.9rem;">Upgrading runtime for speed (v0.85.1)...</p>
+    <h3 style="font-weight: 600;">Booting Secure Environment...</h3>
+    <p style="color: #666; font-size: 0.85rem; margin-top: 8px;">Loading Python Runtime (WebAssembly)</p>
+    <p style="color: #94a3b8; font-size: 0.75rem;">First load may take ~10-15s</p>
   </div>
   <div id="root"></div>
   <script src="https://cdn.jsdelivr.net/npm/@stlite/browser@0.85.1/build/stlite.js"></script>
   <script>
     window.stlite.mount({
-      requirements: ["streamlit", "pandas", "plotly", "numpy", "requests", "toml"],
+      requirements: ["pandas", "plotly", "numpy", "requests", "pyodide-http"],
       entrypoint: "app.py",
       files: {
         "app.py": {
