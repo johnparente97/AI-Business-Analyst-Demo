@@ -3,6 +3,51 @@ import streamlit as st
 import numpy as np
 from collections import Counter
 import io
+import random
+from datetime import datetime, timedelta
+
+def generate_synthetic_csv():
+    """
+    Generates a realistic retail sales dataset as an in-memory CSV buffer.
+    """
+    rows = 5000
+    
+    # 1. Date Range (Last 6 months)
+    end_date = datetime.now()
+    dates = [(end_date - timedelta(days=x)).strftime('%Y-%m-%d') for x in range(180)]
+    col_dates = [random.choice(dates) for _ in range(rows)]
+    
+    # 2. Categories
+    categories = ['Electronics', 'Home & Garden', 'Fashion', 'Sports', 'Beauty']
+    col_cats = [random.choice(categories) for _ in range(rows)]
+    
+    # 3. Regions
+    regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America']
+    col_regions = [random.choice(regions) for _ in range(rows)]
+    
+    # 4. Metrics (Sales, Profit)
+    col_sales = [round(random.uniform(50.0, 1500.0), 2) for _ in range(rows)]
+    col_profit = [round(s * random.uniform(0.1, 0.4), 2) for s in col_sales]
+    
+    # Create DataFrame
+    df = pd.DataFrame({
+        'Date': col_dates,
+        'Category': col_cats,
+        'Region': col_regions,
+        'Sales Amount': col_sales,
+        'Profit': col_profit
+    })
+    
+    # Intentionally add some missing values to test quality checks
+    mask = np.random.choice([True, False], size=rows, p=[0.02, 0.98])
+    df.loc[mask, 'Region'] = np.nan
+    
+    # Return as BytesIO
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False)
+    buffer.seek(0)
+    buffer.name = "sample_retail_data.csv" # Mock filename
+    return buffer
 
 def process_uploaded_file(uploaded_file):
     """
@@ -47,7 +92,7 @@ def process_uploaded_file(uploaded_file):
             # Actually, read_csv doesn't tell us bytes read easily. Let's just update progress based on a rough estimate or just keep it spinning/pulsing if precise byte tracking is hard.
             # However, standard practice: just increment strictly. 
             # Let's use a simpler progress update:
-            current_prog = min(bytes_read / (total_size * 2), 0.95) # Heuristic
+            current_prog = min(bytes_read / (max(1, total_size) * 2), 0.95) # Heuristic, max 1 to avoid div by zero
             progress_bar.progress(current_prog, text=f"Processing {summary['rows']:,} rows...")
 
             # 1. logical type detection (only on first chunk to set schema)
