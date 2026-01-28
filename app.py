@@ -42,8 +42,37 @@ st.markdown("""
     .stButton button {
         border-radius: 20px;
     }
+    .stAlert {
+        padding: 0.5rem;
+    }
+    
+    section[data-testid="stSidebar"] {
+        background-color: rgba(0,0,0,0.02);
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        max-width: 1200px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+def insight_card(title, value, interpretation):
+    st.markdown(
+        f"""
+        <div style="
+            background: rgba(0,0,0,0.03);
+            padding: 18px;
+            border-radius: 14px;
+            margin-bottom: 12px;
+        ">
+            <strong>{title}</strong><br>
+            <span style="font-size: 1.3em;">{value}</span><br>
+            <span style="color: #6c757d;">{interpretation}</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # -----------------
 # 2. Main Logic
@@ -100,14 +129,53 @@ def render_expert_interface():
     # --- PHASE 1: Executive Assessment ---
     st.markdown("---")
     st.subheader(f"📑 Executive Assessment: {context['domain']}")
-    st.caption(f"DETECTED PURPOSE: {context['purpose']}")
     
-    # High Level Stats
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Volume", f"{summary['rows']:,}")
-    m2.metric("Scope", f"{summary['cols']} Variables")
-    m3.metric("Completeness", f"{100 - (summary['total_missing']/max(1, summary['rows']*summary['cols'])*100):.1f}%")
-    m4.metric("Timeline", summary['date_range'])
+    # --- High-Level Insight Metrics (guarded) ---
+    if summary and context:
+        st.markdown("### 🧠 What This Data Appears to Represent")
+
+        st.info(
+            f"""
+            **Expert Interpretation**
+
+            This dataset appears to focus on **{context['domain'].lower()}** information.
+            Based on its structure and variables, it is likely intended to **{context['purpose'].lower()}**.
+
+            The strongest signals suggest the data is more suitable for
+            **directional insight and decision support** rather than precise prediction.
+            """
+        )
+
+        m1, m2, m3, m4 = st.columns(4)
+
+        m1.metric(
+            "Sample Size",
+            f"{summary['rows']:,}",
+            help="Indicates analytical reliability"
+        )
+
+        m2.metric(
+            "Variables",
+            summary['cols'],
+            help="Breadth of measured factors"
+        )
+
+        completeness = 100 - (
+            summary['total_missing'] /
+            max(1, summary['rows'] * summary['cols']) * 100
+        )
+
+        m3.metric(
+            "Data Quality",
+            f"{completeness:.1f}%",
+            help="Higher quality improves insight confidence"
+        )
+
+        m4.metric(
+            "Time Coverage",
+            summary['date_range'] or "Not detected",
+            help="Enables trend and change analysis"
+        )
     
     # Executive Summary Card
     with st.container():
@@ -119,19 +187,48 @@ def render_expert_interface():
         col = [c1, c2, c3][i % 3]
         col.info(f"📌 {signal}")
 
+    st.markdown("### 📌 Analyst Observations")
+    
+    col_a, col_b, col_c = st.columns(3)
+    
+    with col_a:
+        insight_card(
+            "Data Readiness",
+            "High" if completeness > 85 else "Moderate",
+            "Sufficient quality to support strategic conclusions"
+        )
+
+    with col_b:
+        insight_card(
+            "Analytical Leverage",
+            "Strong",
+            "Multiple variables allow for comparison and pattern discovery"
+        )
+
+    with col_c:
+        insight_card(
+            "Decision Utility",
+            "Exploratory",
+            "Best used to understand drivers and tradeoffs, not forecasts"
+        )
+
     st.markdown("---")
     
     # --- PHASE 2: Interactive Deep Dives ---
-    st.subheader("🧐 Recommended Deep Dives")
-    st.write("Select an analysis module to explore further:")
+    st.subheader("� Where an Expert Would Look Next")
+
+    st.write(
+        "Based on the structure and signals in your data, these areas are the most valuable to explore next."
+    )
     
     # Dynamic Buttons based on recommendations
     actions = context.get('recommended_actions', [])
     cols = st.columns(len(actions))
     
     for idx, action in enumerate(actions):
-        if cols[idx].button(f"👉 {action}", key=f"btn_{idx}"):
+        if cols[idx].button(f"� {action}", key=f"btn_{idx}"):
             st.session_state['active_deep_dive'] = action
+            st.toast("Insight unlocked", icon="✨")
     
     # Render Active Module
     if 'active_deep_dive' in st.session_state:
@@ -140,6 +237,15 @@ def render_expert_interface():
 def render_deep_dive_module(action_name, summary):
     st.markdown("---")
     st.markdown(f"### Deep Dive: {action_name}")
+    
+    st.info(
+        f"""
+        **Why this matters**
+
+        Experienced analysts explore **{action_name.lower()}** at this stage to
+        uncover structural drivers and hidden relationships that aren’t immediately obvious.
+        """
+    )
     
     # Logic to map action strings to chart types
     # This is a heuristic mapping based on keywords

@@ -57,8 +57,15 @@ class AIEngine:
         all_cols = ", ".join(list(num_stats.keys()) + list(cat_stats.keys()))
 
         prompt = f"""
-[INST] You are an Expert Data Analyst. 
-Analyze the metadata below and provide a structured JSON assessment.
+[INST] You are a Senior Executive Analyst and Strategist.
+Your role is to interpret analytical summaries and explain:
+- What matters
+- Why it matters
+- What an experienced decision-maker would question next
+
+Avoid generic language.
+Avoid restating obvious facts.
+Focus on implications, risks, and strategic relevance.
 
 DATASET METADATA:
 {info_str}
@@ -71,12 +78,12 @@ KEY CATEGORIES:
 {cat_str}
 
 TASK:
-Return a valid JSON object with these keys:
-- "domain": String (e.g., "Retail", "Healthcare", "Finance", "Logistics", "Other")
-- "purpose": String (1 sentence on what this data likely tracks)
-- "summary": String (3 sentence executive summary of the data scope and volume)
-- "key_signals": List of Strings (3 bullet points on data characteristics)
-- "recommended_actions": List of Strings (3 short click-to-explore questions, e.g., "Analyze Sales Trends", "Compare Region Performance")
+Return a valid JSON object interpreted for a leadership audience:
+- "domain": String (e.g., "Retail", "Healthcare", "Financial Operations")
+- "purpose": String (1 sentence on the likely strategic goal of this data)
+- "summary": String (3 sentence executive brief focusing on scope and scale)
+- "key_signals": List of Strings (3 bullet points on most critical observations)
+- "recommended_actions": List of Strings (3 specific, high-value deep dives, e.g. "Analyze Seasonal Variance", "Inspect Customer Churn Drivers")
 
 Omit markdown formatting. Return raw JSON.
 [/INST]
