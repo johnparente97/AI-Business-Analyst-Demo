@@ -3,6 +3,7 @@ import pandas as pd
 import utils.data_loader as dl
 import utils.chart_generator as cg
 from utils.ai_engine import AIEngine
+import time
 
 # -----------------
 # 1. Config & Style
@@ -22,34 +23,24 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 5rem;
-    }
-    
-    /* Card Styling */
+    /* Clean Cards */
     .stMetric {
         background-color: #f8f9fa;
         padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
-    /* Dark mode adjustment for cards */
+    /* Dark mode */
     @media (prefers-color-scheme: dark) {
         .stMetric {
             background-color: #262730;
-            box-shadow: 0 2px 5px rgba(255,255,255,0.05);
+            box-shadow: 0 1px 3px rgba(255,255,255,0.05);
         }
     }
     
-    h1, h2, h3 {
-        font-weight: 700;
-        letter-spacing: -0.5px;
-    }
-    
-    .stAlert {
-        padding: 0.5rem;
+    .stButton button {
+        border-radius: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -65,94 +56,125 @@ def main():
     with col2:
         st.title("InsightBridge AI")
     
-    st.markdown("### Executive Business Analytics")
-    st.markdown("Upload large datasets (up to 200MB) for instant processing, aggregation, and AI-driven strategic insights.")
-    st.markdown("---")
+    if 'analysis_state' not in st.session_state:
+        st.session_state['analysis_state'] = 'upload' # upload, processing, assessed, deep_dive
 
-    # File Upload
-    uploaded_file = st.file_uploader("📂 Upload CSV Data", type=["csv"], help="Optimized for files up to 200MB")
+    uploaded_file = st.file_uploader("📂 Upload Dataset", type=["csv"], help="Max 200MB")
     
     if uploaded_file is None:
-        render_landing_info()
+        render_landing()
+        st.session_state['analysis_state'] = 'upload'
+        st.session_state['summary_data'] = None
+        st.session_state['ai_context'] = None
     else:
-        # File Size Check
-        uploaded_file.seek(0, 2)
-        size_mb = uploaded_file.tell() / (1024 * 1024)
-        uploaded_file.seek(0)
-        
-        if size_mb > 200:
-            st.warning(f"⚠️ File size ({size_mb:.1f}MB) exceeds recommended simple analysis limit (200MB). Performance may vary.")
-        
-        # Process Stream
-        if 'summary_data' not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
-            with st.spinner("Processing Dataset..."):
+        # Check if new file
+        if st.session_state.get('file_name') != uploaded_file.name:
+            st.session_state['file_name'] = uploaded_file.name
+            st.session_state['analysis_state'] = 'processing'
+            
+            with st.spinner("🔍 Reading & Profiling Data..."):
                 summary = dl.process_uploaded_file(uploaded_file)
                 st.session_state['summary_data'] = summary
-                st.session_state['file_name'] = uploaded_file.name
-        
+                
+            with st.spinner("🧠 Analyzing Context & Domain..."):
+                 ai = AIEngine()
+                 context = ai.analyze_dataset_context(summary)
+                 st.session_state['ai_context'] = context
+            
+            st.session_state['analysis_state'] = 'assessed'
+            st.rerun()
+
+        # Render Main Interface if processed
         if st.session_state.get('summary_data'):
-            render_dashboard(st.session_state['summary_data'])
+            render_expert_interface()
 
-def render_landing_info():
-    st.info("👋 **Welcome!** Drag and drop a CSV file above to begin. No API keys or setup required.")
+def render_landing():
+    st.markdown("### Expert Business Analyst")
+    st.markdown("Drop a file to receive an instant executive briefing and guided strategic deep-dives.")
+    st.info("👋 **Welcome!** Analysis happens locally on the server. No raw data is shared.")
+
+def render_expert_interface():
+    summary = st.session_state['summary_data']
+    context = st.session_state['ai_context']
     
-    st.markdown("""
-    #### Capabilities:
-    *   **Large File Support**: Efficiently processes up to 200MB CSVs using server-side streaming.
-    *   **Secure & Private**: Raw data is **never** sent to AI models; only anonymous statistical summaries are analyzed.
-    *   **Instant Aggregation**: Automatic calculation of trends, distributions, and data quality metrics.
-    """)
-
-def render_dashboard(summary):
-    # 1. Top Level Metrics
+    # --- PHASE 1: Executive Assessment ---
+    st.markdown("---")
+    st.subheader(f"📑 Executive Assessment: {context['domain']}")
+    st.caption(f"DETECTED PURPOSE: {context['purpose']}")
+    
+    # High Level Stats
     m1, m2, m3, m4 = st.columns(4)
-    if summary:
-        m1.metric("Total Records", f"{summary['rows']:,}")
-        m2.metric("Variables", summary['cols'])
-        m3.metric("Missing Values", f"{summary['total_missing']:,}")
-        m4.metric("Date Period", summary['date_range'])
+    m1.metric("Volume", f"{summary['rows']:,}")
+    m2.metric("Scope", f"{summary['cols']} Variables")
+    m3.metric("Completeness", f"{100 - (summary['total_missing']/max(1, summary['rows']*summary['cols'])*100):.1f}%")
+    m4.metric("Timeline", summary['date_range'])
     
+    # Executive Summary Card
+    with st.container():
+        st.success(f"**Insight:** {context['summary']}")
+    
+    # Signals
+    c1, c2, c3 = st.columns(3)
+    for i, signal in enumerate(context['key_signals']):
+        col = [c1, c2, c3][i % 3]
+        col.info(f"📌 {signal}")
+
     st.markdown("---")
     
-    # 2. Visualizations (Auto-Generated)
-    c1, c2 = st.columns(2)
+    # --- PHASE 2: Interactive Deep Dives ---
+    st.subheader("🧐 Recommended Deep Dives")
+    st.write("Select an analysis module to explore further:")
     
-    with c1:
-        # Trend Chart
-        fig_trend = cg.create_trend_chart(summary, title="📈 Activity Trends")
-        if fig_trend:
-            st.plotly_chart(fig_trend, use_container_width=True)
-        else:
-            st.warning("No time-series data detected for trend analysis.")
+    # Dynamic Buttons based on recommendations
+    actions = context.get('recommended_actions', [])
+    cols = st.columns(len(actions))
+    
+    for idx, action in enumerate(actions):
+        if cols[idx].button(f"👉 {action}", key=f"btn_{idx}"):
+            st.session_state['active_deep_dive'] = action
+    
+    # Render Active Module
+    if 'active_deep_dive' in st.session_state:
+        render_deep_dive_module(st.session_state['active_deep_dive'], summary)
 
-    with c2:
-        # Categorical Breakdown
-        fig_cat = cg.create_categorical_chart(summary, title="📊 Primary Category Distribution")
+def render_deep_dive_module(action_name, summary):
+    st.markdown("---")
+    st.markdown(f"### Deep Dive: {action_name}")
+    
+    # Logic to map action strings to chart types
+    # This is a heuristic mapping based on keywords
+    action = action_name.lower()
+    
+    if "trend" in action or "time" in action:
+        st.caption("Visualizing volume and activity over the detected timeline.")
+        fig = cg.create_trend_chart(summary)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("> **Strategist Note:** Look for seasonality or sudden drops that correlate with external business events.")
+        else:
+            st.warning("Insufficient time-series data for this view.")
+            
+    elif "category" in action or "compare" in action:
+        st.caption("Comparing performance across primary segments.")
+        fig = cg.create_categorical_chart(summary)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("> **Strategist Note:** Pareto principle often applies—focus resources on the top performing segments.")
+        else:
+            st.warning("No clear categorical segments found.")
+            
+    elif "numeric" in action or "distribution" in action:
+        st.caption("Analyzing statistical spread of key variables.")
+        # Currently we don't have a numeric distribution chart in the new cg, 
+        # let's fallback or just show stats
+        st.write("**Key Numeric Distributions**")
+        stats = summary.get('numeric_stats', {})
+        st.dataframe(pd.DataFrame(stats).T)
+        st.markdown("> **Strategist Note:** Check the 'min' and 'max' columns for outliers that might skew average performance.")
         
-        if fig_cat:
-            st.plotly_chart(fig_cat, use_container_width=True)
-        else:
-            st.info("Could not detect significant categorical distributions.")
-
-    st.markdown("---")
-
-    # 3. AI Executive Summary
-    st.header("📝 Executive Strategic Analysis")
-    
-    # Initialize engine
-    ai = AIEngine()
-    
-    # Generate content
-    analysis_container = st.container()
-    
-    with analysis_container:
-        with st.spinner("🤖 synthesizing strategic insights (this may take a moment)..."):
-            try:
-                # Pass summary statistics to AI
-                obs = ai.generate_executive_summary(summary)
-                st.markdown(obs)
-            except Exception as e:
-                st.error(f"Analysis failed: {e}")
+    else:
+        st.info("Displaying general statistical overview.")
+        st.json(summary['numeric_stats'])
 
 if __name__ == "__main__":
     main()
