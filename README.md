@@ -1,6 +1,6 @@
 # InsightBridge AI 🌉
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-business-analyst-demo.streamlit.app)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-business-analyst-demo-t3vymbiwzgyuf9h5rdzxhv.streamlit.app)
 
 **Scalable. Secure. Strategic.**
 
