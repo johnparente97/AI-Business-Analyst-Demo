@@ -14,7 +14,7 @@ class AIEngine:
     def analyze_dataset_context(self, summary_data):
         """
         Performs the Phase 1 assessment: Domain, Purpose, Signals.
-        Returns a structured dictionary.
+        Returns a structured dictionary with DEEP intelligence.
         """
         # Prepare the context for the LLM
         context = self._prepare_context(summary_data)
@@ -53,19 +53,13 @@ class AIEngine:
             top_3 = ", ".join([f"{k}" for k,v in counter.most_common(3)])
             cat_str += f"- {col}: {top_3}\n"
 
-        # 4. Sample Columns (Names)
-        all_cols = ", ".join(list(num_stats.keys()) + list(cat_stats.keys()))
+        # 4. Column Names for role classification
+        all_cols_list = list(num_stats.keys()) + list(cat_stats.keys())
+        all_cols = ", ".join(all_cols_list)
 
         prompt = f"""
-[INST] You are a Senior Executive Analyst and Strategist.
-Your role is to interpret analytical summaries and explain:
-- What matters
-- Why it matters
-- What an experienced decision-maker would question next
-
-Avoid generic language.
-Avoid restating obvious facts.
-Focus on implications, risks, and strategic relevance.
+[INST] You are a Senior Principal Analyst.
+Interpret the metadata below to provide a "Data Story".
 
 DATASET METADATA:
 {info_str}
@@ -78,13 +72,22 @@ KEY CATEGORIES:
 {cat_str}
 
 TASK:
-Return a valid JSON object interpreted for a leadership audience:
-- "domain": String (e.g., "Retail", "Healthcare", "Financial Operations")
-- "purpose": String (1 sentence on the likely strategic goal of this data)
-- "summary": String (3 sentence executive brief focusing on scope and scale)
-- "key_signals": List of Strings (3 bullet points on most critical observations)
-- "recommended_actions": List of Strings (3 specific, high-value deep dives, e.g. "Analyze Seasonal Variance", "Inspect Customer Churn Drivers")
+Return a valid JSON object with the following structure:
+{{
+  "domain": "String (e.g., Retail, Finance)",
+  "executive_synthesis": {{
+    "observation": "2 sentences describing what the data represents structurally.",
+    "implication": "2 sentences explaining the strategic value or potential risk in this data."
+  }},
+  "variable_intelligence": [
+     {{ "column": "ColName", "role": "Metric (KPI)" or "Segment (Dimension)" or "Temporal (Time)" or "Identifier" or "Noise", "description": "Short explanation" }}
+     // Categorize the top 5 most important columns only
+  ],
+  "key_signals": [ "String 1", "String 2", "String 3"],
+  "recommended_actions": [ "String 1", "String 2", "String 3"]
+}}
 
+Be decisive. Classify variables based on their likely use in business intelligence (e.g. Sales is a Metric, Region is a Segment).
 Omit markdown formatting. Return raw JSON.
 [/INST]
 """
@@ -92,12 +95,11 @@ Omit markdown formatting. Return raw JSON.
 
     def _call_huggingface(self, prompt):
         headers = {"Authorization": f"Bearer {self.api_token}"}
-        # Lower temp for strict JSON
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 500,
-                "temperature": 0.1, 
+                "max_new_tokens": 1000,
+                "temperature": 0.2, 
                 "return_full_text": False
             }
         }
@@ -113,27 +115,20 @@ Omit markdown formatting. Return raw JSON.
             raise ValueError("Unexpected API response structure")
 
     def _parse_json_response(self, text, summary_data):
-        """
-        Robustly parses JSON from LLM output.
-        """
         try:
-            # Try to find JSON block if wrapped in markdown
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0]
             elif "{" in text:
                 text = text[text.find("{"):text.rfind("}")+1]
-            
-            data = json.loads(text)
-            return data
+            return json.loads(text)
         except:
-             # Fallback if JSON is malformed
             return self._generate_fallback_analysis(summary_data)
 
     def _generate_fallback_analysis(self, data):
         """
         Deterministic expert fallback.
         """
-        time.sleep(1) # Simulate thinking
+        time.sleep(1) 
         
         # Heuristic Domain Detection
         cols = (list(data.get("numeric_stats", {}).keys()) + list(data.get("categorical_stats", {}).keys()))
@@ -142,29 +137,31 @@ Omit markdown formatting. Return raw JSON.
         domain = "General Operations"
         if any(x in cols_str for x in ['sales', 'revenue', 'price', 'cost']):
             domain = "Financial / Retail"
-        elif any(x in cols_str for x in ['patient', 'diagnosis', 'drug', 'treatment']):
+        elif any(x in cols_str for x in ['patient', 'diagnosis', 'drug']):
             domain = "Healthcare"
-        elif any(x in cols_str for x in ['log', 'error', 'status', 'ip', 'server']):
-            domain = "IT / System Logs"
             
-        purpose = f"This dataset appears to track {domain.lower()} metrics, containing {data['rows']:,} records."
-        
-        actions = []
+        # Variable Intelligence Heuristics
+        var_intel = []
         if data.get("date_col"):
-            actions.append("Analyze Trends Over Time")
-        if data.get("categorical_stats"):
-            actions.append("Compare Categories")
-        if data.get("numeric_stats"):
-            actions.append("Inspect Numeric Distributions")
+            var_intel.append({"column": data['date_col'], "role": "Temporal (Time)", "description": "Primary timeline for trend analysis."})
+        
+        for col in list(data.get("numeric_stats", {}).keys())[:2]:
+            var_intel.append({"column": col, "role": "Metric (KPI)", "description": "Key numeric performance indicator."})
             
+        for col in list(data.get("categorical_stats", {}).keys())[:2]:
+            var_intel.append({"column": col, "role": "Segment (Dimension)", "description": "Categorical grouping factor."})
+
         return {
             "domain": domain,
-            "purpose": purpose,
-            "summary": f"The dataset contains {data['rows']:,} records and {data['cols']} variables. It covers the period {data['date_range']}.",
+            "executive_synthesis": {
+                "observation": f"The dataset tracks {len(cols)} variables across {data['rows']:,} records, primarily focused on {domain.lower()} metrics.",
+                "implication": "The presence of both time-series and categorical dimensions suggests strong potential for identifying performance drivers and seasonal trends."
+            },
+            "variable_intelligence": var_intel,
             "key_signals": [
-                f"Volume: {data['rows']:,} records processed.",
-                f"Completeness: {data['total_missing']:,} missing values detected.",
-                f"Complexity: {len(cols)} core variables identified."
+                f"Data Volume: High reliability with {data['rows']:,} samples.",
+                f"Completeness: {100 - (data['total_missing']/(max(1,data['rows']*data['cols']))*100):.1f}% valid data points.",
+                f"Temporal Coverage: {data['date_range']}."
             ],
-            "recommended_actions": actions
+            "recommended_actions": ["Analyze Trends Over Time", "Compare Categories", "Inspect Distributions"]
         }

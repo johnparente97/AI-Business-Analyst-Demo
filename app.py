@@ -158,44 +158,78 @@ def render_expert_interface():
     summary = st.session_state['summary_data']
     context = st.session_state['ai_context']
     
-    # --- PHASE 1: Executive Assessment ---
-    st.subheader(f"{context['domain']} Assessment")
+    # --- PHASE 1: Domain Assessment ---
+    st.subheader(f"📑 Executive Assessment: {context.get('domain', 'General Purpose')}")
     
-    # Executive Summary (Hero Component)
-    st.info(f"**Briefing**: {context['summary']}")
+    # --- PHASE 2: Executive Synthesis (New) ---
+    synthesis = context.get('executive_synthesis', {})
+    if synthesis:
+        st.markdown(
+            """
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid #00d2be;">
+                <h3 style="margin-top: 0; font-size: 1.2em; color: #2c3e50;">🎙️ Executive Synthesis</h3>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        cA, cB = st.columns(2)
+        with cA:
+            st.markdown(f"**🧐 Observation**\n\n{synthesis.get('observation', 'Analyzing data structure...')}")
+        with cB:
+            st.markdown(f"**💡 Strategic Implication**\n\n{synthesis.get('implication', 'Identifying value levers...')}")
+        st.markdown("---")
 
-    # --- Insight Cards ---
-    st.markdown("#### 🧠 Strategic Signals")
-    
+    # --- PHASE 3: Variable Intelligence (New) ---
+    var_intel = context.get('variable_intelligence', [])
+    if var_intel:
+        st.subheader("🧬 Variable Anatomy")
+        st.caption("Auto-classification of key drivers within your dataset.")
+        
+        # Format as neat dataframe
+        df_intel = pd.DataFrame(var_intel)
+        if not df_intel.empty:
+            st.dataframe(
+                df_intel, 
+                column_config={
+                    "column": "Variable Name",
+                    "role": st.column_config.SelectboxColumn("Detected Role", width="medium"),
+                    "description": st.column_config.TextColumn("Analyst Note", width="large")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+        st.markdown("---")
+
+    # --- PHASE 4: Strategic Signals ---
+    st.subheader("📌 Analyst Observations")
     if summary and context:
         col_a, col_b, col_c = st.columns(3)
-        
         completeness = 100 - (summary['total_missing'] / max(1, summary['rows'] * summary['cols']) * 100)
         
         with col_a:
             insight_card(
                 "Data Confidence",
                 f"{completeness:.0f}%",
-                "High data integrity supports reliable decision making." if completeness > 90 else "Moderate integrity; consider data cleaning for precision."
+                "High data integrity supports reliable decision making." if completeness > 90 else "Moderate integrity; consider data cleaning."
             )
 
         with col_b:
             insight_card(
                 "Metric Dimensionality",
                 f"{summary['cols']} Variables",
-                "Wide scope allows for multi-factor correlation analysis." if summary['cols'] > 10 else "Focused dataset for specific KPI tracking."
+                "Wide scope allows for multi-factor correlation." if summary['cols'] > 10 else "Focused dataset for specific KPI tracking."
             )
 
         with col_c:
             insight_card(
                 "Temporal Depth",
                 "Detected" if summary['date_range'] != "N/A" else "Static",
-                f"Coverage from {summary['date_range']} allows for trend identification." if summary['date_range'] != 'N/A' else "Snapshot data suitable for distribution analysis."
+                f"Coverage from {summary['date_range']} allows trend identification." if summary['date_range'] != 'N/A' else "Snapshot data suitable for distribution analysis."
             )
-
+            
     st.markdown("---")
     
-    # --- PHASE 2: Interactive Deep Dives ---
+    # --- PHASE 5: Deep Dives ---
     st.subheader("🧭 Recommended Next Steps")
 
     st.write(
