@@ -82,17 +82,14 @@ def process_uploaded_file(uploaded_file):
     uploaded_file.seek(0)
     
     progress_bar = st.progress(0, text="Processing data chunks...")
-    bytes_read = 0
+    chunk_count = 0
     
     try:
         # Iterate through chunks
         for chunk in pd.read_csv(uploaded_file, chunksize=CHUNK_SIZE):
-            # Update bytes read for progress calculation (approximate)
-            bytes_read += chunk.memory_usage(deep=True).sum() # This is memory size, not file size, but good enough proxy for progress if normalized carefully or just mapped to iteration if we knew row count. 
-            # Actually, read_csv doesn't tell us bytes read easily. Let's just update progress based on a rough estimate or just keep it spinning/pulsing if precise byte tracking is hard.
-            # However, standard practice: just increment strictly. 
-            # Let's use a simpler progress update:
-            current_prog = min(bytes_read / (max(1, total_size) * 2), 0.95) # Heuristic, max 1 to avoid div by zero
+            chunk_count += 1
+            # Progress: estimate ~50 chunks for a large file, cap at 95%
+            current_prog = min(chunk_count / 50, 0.95)
             progress_bar.progress(current_prog, text=f"Processing {summary['rows']:,} rows...")
 
             # 1. logical type detection (only on first chunk to set schema)
@@ -118,7 +115,7 @@ def process_uploaded_file(uploaded_file):
                                 # Test conversion
                                 pd.to_datetime(chunk[col].head(100), errors='raise')
                                 date_cols.append(col)
-                            except:
+                            except (ValueError, TypeError, pd.errors.ParserError):
                                 categorical_cols.append(col)
                                 summary["categorical_stats"][col] = Counter()
                         else:

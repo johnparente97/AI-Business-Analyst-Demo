@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# DataInsight AI — React Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A standalone client-side business analytics SPA built with React 19, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Data Import**: Upload CSV/JSON files, fetch from public APIs, or use preset datasets
+- **Instant Analytics**: Automatic numeric/categorical field detection, statistics, and trend analysis
+- **AI Chat**: Multi-provider LLM integration (Gemini, Groq, OpenAI, Anthropic) with streaming responses
+- **Dark Mode**: System-aware with manual toggle
+- **Responsive Design**: Glassmorphism UI with smooth animations
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Layer | Technology |
+|-------|------------|
+| Framework | React 19 + TypeScript |
+| Build | Vite 8 |
+| Styling | Tailwind CSS 4 |
+| State | Zustand 5 |
+| Charts | Recharts 3 |
+| Icons | Lucide React |
+| CSV Parsing | PapaParse |
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app runs at `http://localhost:5173` by default.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Project Structure
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── components/          # UI components
+│   ├── dashboard/       # Dashboard sub-components (stats, charts, table)
+│   ├── chat/            # AI chat sub-components (messages, markdown, suggestions)
+│   ├── LandingView.tsx  # Landing page with data import options
+│   ├── Dashboard.tsx    # Main analytics dashboard
+│   ├── ChatPanel.tsx    # AI chat interface
+│   ├── DataImportPanel.tsx  # Data import modal
+│   └── AISetupModal.tsx # LLM provider configuration
+├── store/               # Zustand state management
+├── hooks/               # Custom React hooks
+├── types/               # TypeScript type definitions
+└── utils/
+    ├── analyze.ts       # Core analytics engine
+    ├── parsers.ts       # CSV/JSON parsing
+    ├── fetcher.ts       # API data fetching with presets
+    └── llm/             # Multi-provider LLM integration
+```
+
+## Configuration
+
+AI features require an API key from one of the supported providers. Configure via the AI Setup modal in the app — keys are stored in browser localStorage.
+
+> **Note**: Anthropic's API does not support direct browser requests (CORS). Use Gemini, Groq, or OpenAI for browser-based usage.

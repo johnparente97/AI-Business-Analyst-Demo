@@ -70,8 +70,12 @@ function analyzeField(key: string, records: DataRecord[]): FieldStat {
 
   const cleaned = rawValues.map((v) => v.trim())
 
+  // Detect date/time columns — skip numeric parsing for these
+  const DATE_PATTERN = /date|time|created_at|updated_at|timestamp|_date|_dt|datetime/i
+  const isDateColumn = DATE_PATTERN.test(key)
+
   // Detect numeric: strip $ % , and see if the result is a valid number
-  const numericValues = cleaned
+  const numericValues = isDateColumn ? [] : cleaned
     .map((v) => parseFloat(v.replace(/[$%,\s]/g, '').replace(/B$/, 'e9').replace(/M$/, 'e6').replace(/K$/, 'e3')))
     .filter((n) => !isNaN(n) && isFinite(n))
 

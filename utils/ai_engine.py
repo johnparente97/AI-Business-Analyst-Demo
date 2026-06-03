@@ -93,7 +93,7 @@ Omit markdown formatting. Return raw JSON.
 """
         return prompt
 
-    def _call_huggingface(self, prompt):
+    def _call_huggingface(self, prompt, retries=1):
         headers = {"Authorization": f"Bearer {self.api_token}"}
         payload = {
             "inputs": prompt,
@@ -104,15 +104,25 @@ Omit markdown formatting. Return raw JSON.
             }
         }
         
-        response = requests.post(self.api_url, headers=headers, json=payload, timeout=25)
-        response.raise_for_status()
-        
-        # Parse output
-        result = response.json()
-        if isinstance(result, list) and len(result) > 0:
-            return result[0].get('generated_text', '').strip()
-        else:
-            raise ValueError("Unexpected API response structure")
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                response = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
+                response.raise_for_status()
+                
+                # Parse output
+                result = response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    return result[0].get('generated_text', '').strip()
+                else:
+                    raise ValueError("Unexpected API response structure")
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_error = e
+                if attempt < retries:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                raise
+        raise last_error
 
     def _parse_json_response(self, text, summary_data):
         try:
@@ -121,14 +131,13 @@ Omit markdown formatting. Return raw JSON.
             elif "{" in text:
                 text = text[text.find("{"):text.rfind("}")+1]
             return json.loads(text)
-        except:
+        except (json.JSONDecodeError, ValueError, KeyError, IndexError):
             return self._generate_fallback_analysis(summary_data)
 
     def _generate_fallback_analysis(self, data):
         """
         Deterministic expert fallback.
         """
-        time.sleep(1) 
         
         # Heuristic Domain Detection
         cols = (list(data.get("numeric_stats", {}).keys()) + list(data.get("categorical_stats", {}).keys()))

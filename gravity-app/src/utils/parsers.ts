@@ -8,7 +8,7 @@
 import type { DataRecord } from '../types/data'
 import { nanoid } from '../utils/nanoid'
 
-const MAX_RECORDS = 15
+const MAX_RECORDS = 500
 
 /**
  * Parse a CSV string into DataRecord[].

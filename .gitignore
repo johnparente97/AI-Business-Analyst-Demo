@@ -18,3 +18,7 @@ ENV/
 .vscode/
 .idea/
 .DS_Store
+
+# Node / gravity-app
+gravity-app/node_modules/
+gravity-app/dist/

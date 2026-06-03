@@ -145,6 +145,9 @@ def process_and_load(file_buffer, name):
     
     with st.spinner("🔍 Profiling Data Structure..."):
         summary = dl.process_uploaded_file(file_buffer)
+        if summary is None:
+            st.error("Failed to process the file. Please check the format and try again.")
+            return
         st.session_state['summary_data'] = summary
         
     with st.spinner("🧠 Synthesizing Intelligence..."):
@@ -228,6 +231,22 @@ def render_expert_interface():
             )
             
     st.markdown("---")
+
+    # --- PHASE 4b: Key Signals ---
+    key_signals = context.get('key_signals', [])
+    if key_signals:
+        st.subheader("🔑 Key Signals")
+        for signal in key_signals:
+            st.markdown(f"- {signal}")
+        st.markdown("---")
+
+    # --- PHASE 4c: Data Preview ---
+    sample_df = summary.get('sample_data')
+    if sample_df is not None and not sample_df.empty:
+        with st.expander("👁️ Data Preview (First 5 Rows)", expanded=False):
+            st.dataframe(sample_df, use_container_width=True, hide_index=True)
+    
+    st.markdown("---")
     
     # --- PHASE 5: Deep Dives ---
     st.subheader("🧭 Recommended Next Steps")
@@ -237,6 +256,10 @@ def render_expert_interface():
     )
     
     actions = context.get('recommended_actions', [])
+    if not actions:
+        st.info("No specific actions recommended for this dataset. Try uploading a more detailed file.")
+        return
+    
     cols = st.columns(len(actions))
     
     for idx, action in enumerate(actions):
@@ -279,8 +302,35 @@ def render_deep_dive_module(action_name, summary):
             st.warning("No clear categorical segments found.")
         
     else:
-        st.info("Displaying general statistical overview.")
-        st.json(summary['numeric_stats'])
+        # Distribution analysis for numeric columns
+        st.info("Displaying statistical distribution overview.")
+        numeric_stats = summary.get('numeric_stats', {})
+        if numeric_stats:
+            # Create a summary comparison chart
+            import plotly.graph_objects as go
+            cols_list = list(numeric_stats.keys())[:6]  # Limit to 6 columns
+            means = [numeric_stats[c].get('mean', 0) for c in cols_list]
+            stds = [numeric_stats[c].get('std', 0) for c in cols_list]
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                name='Mean', x=cols_list, y=means,
+                marker_color='#5e17eb',
+                error_y=dict(type='data', array=stds, visible=True, color='#888')
+            ))
+            fig.update_layout(
+                title="Numeric Variable Distribution (Mean ± Std Dev)",
+                template="plotly_white",
+                font=dict(family="Inter, sans-serif", size=12),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor="#f0f2f6", zeroline=False),
+                margin=dict(l=40, r=40, t=60, b=40)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.json(summary.get('numeric_stats', {}))
 
 if __name__ == "__main__":
     main()

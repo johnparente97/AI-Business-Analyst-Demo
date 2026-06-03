@@ -14,6 +14,7 @@ import { analyzeRecords } from './utils/analyze'
 import { LandingView } from './components/LandingView'
 import { Dashboard } from './components/Dashboard'
 import { DataImportPanel } from './components/DataImportPanel'
+import ErrorBoundary from './components/ErrorBoundary'
 import type { DataRecord } from './types/data'
 
 export default function App() {
@@ -61,7 +62,7 @@ export default function App() {
   const insights = useMemo(() => analyzeRecords(records), [records])
 
   return (
-    <>
+    <ErrorBoundary>
       {/* Dark mode toggle — always top-right */}
       <button
         onClick={toggleDarkMode}
@@ -111,6 +112,6 @@ export default function App() {
           onClear={handleClear}
         />
       )}
-    </>
+    </ErrorBoundary>
   )
 }

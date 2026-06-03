@@ -19,6 +19,16 @@ InsightBridge AI is an advanced business analytics platform designed to instantl
 *   **Data Processing**: Pandas (Chunked Streaming)
 *   **Visualization**: Plotly Interactive Charts
 *   **Intelligence**: Hugging Face Inference API (Mistral-7B)
+*   **Frontend Alternative**: React 19 + Vite + TypeScript (`gravity-app/`)
+
+## 📁 Repository Structure
+
+This repo contains **two independent frontends** for the same analytics concept:
+
+| Path | Stack | Purpose |
+|------|-------|---------|
+| `app.py` + `utils/` | Python / Streamlit | Primary demo — server-rendered, deployed on Streamlit Cloud |
+| `gravity-app/` | React / Vite / TypeScript | Standalone SPA — client-side analytics + multi-provider AI chat |
 
 ## 📋 How to Use
 

@@ -28,7 +28,7 @@ def create_trend_chart(summary_data, title="📈 Activity Trends"):
     full_title = f"{title} <span style='font-size: 14px; color: grey;'>({direction})</span>"
     
     fig = px.area(df, x='Date', y='Records', title=full_title)
-    fig.update_traces(line_color=COLOR_PRIMARY, fill_color="rgba(94, 23, 235, 0.1)")
+    fig.update_traces(line_color=COLOR_PRIMARY, fillcolor="rgba(94, 23, 235, 0.1)")
     
     _apply_premium_layout(fig)
     return fig
