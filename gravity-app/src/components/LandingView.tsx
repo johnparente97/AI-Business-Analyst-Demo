@@ -43,7 +43,9 @@ export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
     setError(null)
     try {
       const records = await fetchFromUrl(customUrl.trim())
-      onDataLoaded(records, new URL(customUrl.trim()).hostname)
+      let hostname = 'API'
+      try { hostname = new URL(customUrl.trim()).hostname } catch { /* keep fallback */ }
+      onDataLoaded(records, hostname)
     } catch (e: unknown) {
       setError((e as Error).message)
     } finally { setLoading(null) }

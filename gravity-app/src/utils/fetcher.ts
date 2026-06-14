@@ -203,7 +203,13 @@ export async function fetchFromUrl(url: string): Promise<DataRecord[]> {
     throw new Error('Only HTTP/HTTPS URLs are supported')
   }
 
+  // Reject dangerous protocols that could sneak through
+  if (parsed.protocol === 'javascript:' || parsed.protocol === 'data:') {
+    throw new Error('Unsupported URL protocol')
+  }
+
   let text: string
+  let directError: string | null = null
 
   try {
     // Try direct fetch first
@@ -213,16 +219,26 @@ export async function fetchFromUrl(url: string): Promise<DataRecord[]> {
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     text = await resp.text()
-  } catch {
+  } catch (e: unknown) {
+    directError = (e as Error).message ?? 'Unknown error'
     // Fall back to allOrigins CORS proxy
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-    const proxyResp = await fetch(proxyUrl, {
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!proxyResp.ok) throw new Error(`Proxy returned ${proxyResp.status}`)
-    const proxyJson = await proxyResp.json() as { contents: string }
-    text = proxyJson.contents
+    try {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+      const proxyResp = await fetch(proxyUrl, {
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!proxyResp.ok) throw new Error(`Proxy returned ${proxyResp.status}`)
+      const proxyJson = await proxyResp.json() as { contents: string }
+      text = proxyJson.contents
+    } catch (proxyErr: unknown) {
+      // Surface the original error with context about the proxy failure
+      throw new Error(
+        `Could not fetch data. Direct: ${directError}. CORS proxy also failed: ${(proxyErr as Error).message ?? 'Unknown error'}. ` +
+        `Make sure the URL returns valid JSON.`
+      )
+    }
   }
 
-  return parseJSON(text, new URL(url).hostname)
+  return parseJSON(text, parsed.hostname)
 }
+

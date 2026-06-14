@@ -117,22 +117,35 @@ async function streamAnthropic(
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role, content: m.content }))
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': config.apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: 3000,
-      system: systemMsg,
-      messages: chatMsgs,
-      stream: true,
-    }),
-  })
+  let res: Response
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 3000,
+        system: systemMsg,
+        messages: chatMsgs,
+        stream: true,
+      }),
+    })
+  } catch (e: unknown) {
+    // Anthropic does not support CORS — browser requests are always blocked
+    const msg = (e as Error).message ?? ''
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+      throw new Error(
+        'Anthropic\'s API does not support direct browser requests (CORS). ' +
+        'Please use Gemini, Groq, or OpenAI instead — or route through a backend proxy.'
+      )
+    }
+    throw e
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
@@ -159,13 +172,18 @@ async function readSSEStream(
 
   let full = ''
   const decoder = new TextDecoder()
+  let lineBuffer = '' // Buffer for partial lines across read() boundaries
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    const raw = decoder.decode(value, { stream: true })
+    const raw = lineBuffer + decoder.decode(value, { stream: true })
+    const lines = raw.split('\n')
 
-    for (const line of raw.split('\n')) {
+    // The last element may be a partial line — buffer it for the next read
+    lineBuffer = lines.pop() ?? ''
+
+    for (const line of lines) {
       if (!line.startsWith('data: ') || line.includes('[DONE]')) continue
       try {
         const json = JSON.parse(line.slice(6))
@@ -175,5 +193,15 @@ async function readSSEStream(
     }
   }
 
+  // Process any remaining buffered content
+  if (lineBuffer.startsWith('data: ') && !lineBuffer.includes('[DONE]')) {
+    try {
+      const json = JSON.parse(lineBuffer.slice(6))
+      const text = extractText(json)
+      if (text) { full += text; onChunk(text) }
+    } catch { /* skip malformed */ }
+  }
+
   return full
 }
+

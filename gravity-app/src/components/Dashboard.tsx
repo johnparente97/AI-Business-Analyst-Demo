@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import type { DataInsights } from '../utils/analyze'
 import type { DataRecord } from '../types/data'
 import { ChatPanel } from './ChatPanel'
@@ -8,7 +8,7 @@ import { DashboardHeader } from './dashboard/DashboardHeader'
 import { StatPills } from './dashboard/StatPills'
 import { NumericCard } from './dashboard/NumericCard'
 import { CatBar } from './dashboard/CatBar'
-import { TopValuesChart } from './dashboard/TopValuesChart'
+const TopValuesChart = lazy(() => import('./dashboard/TopValuesChart').then(m => ({ default: m.TopValuesChart })))
 import { DataTable } from './dashboard/DataTable'
 
 interface DashboardProps {
@@ -60,12 +60,14 @@ export function Dashboard({ records, source, insights, isDark, onChangeData }: D
               </div>
             )}
 
-            <TopValuesChart
-              insights={insights}
-              activeChartField={activeChartField}
-              setActiveChartField={setActiveChartField}
-              isDark={isDark}
-            />
+            <Suspense fallback={<div className={`rounded-2xl border h-56 animate-pulse ${isDark ? 'bg-[#111113] border-[#1f1f23]' : 'bg-white border-gray-100'}`} />}>
+              <TopValuesChart
+                insights={insights}
+                activeChartField={activeChartField}
+                setActiveChartField={setActiveChartField}
+                isDark={isDark}
+              />
+            </Suspense>
 
             {catFields.length > 0 && (
               <div className={`rounded-2xl border ${isDark ? 'bg-[#111113] border-[#1f1f23]' : 'bg-white border-gray-100'}`}>
