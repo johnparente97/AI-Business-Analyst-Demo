@@ -3,10 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg-info/
+dist/
+build/
 
 # Environments
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
@@ -14,11 +17,23 @@ ENV/
 # Streamlit
 .streamlit/secrets.toml
 
+# Google Cloud SDK
+google-cloud-sdk/
+*.tar.gz
+
 # IDE
 .vscode/
 .idea/
+
+# OS
 .DS_Store
+Thumbs.db
 
 # Node / gravity-app
 gravity-app/node_modules/
 gravity-app/dist/
+
+# Misc
+*.log
+.coverage
+htmlcov/
