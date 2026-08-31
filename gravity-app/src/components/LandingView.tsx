@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { Upload, Globe, ArrowRight, Database, Sparkles, FileText } from 'lucide-react'
+import { Upload, Globe, ArrowRight, Database, Sparkles, FileText, ShieldCheck, Zap, BarChart3 } from 'lucide-react'
 import { DATA_PRESETS, fetchPreset } from '../utils/fetcher'
 import { fetchFromUrl } from '../utils/fetcher'
 import type { DataRecord } from '../types/data'
@@ -16,6 +16,20 @@ interface Props {
 }
 
 const FEATURED = ['countries', 'crypto', 'users', 'posts', 'space', 'cat-facts']
+
+const DEMO_RECORDS: DataRecord[] = [
+  ['Jan', '128400', '31.2', 'North America', 'Enterprise'],
+  ['Feb', '141800', '33.7', 'Europe', 'Partner'],
+  ['Mar', '139200', '32.9', 'Asia Pacific', 'Self-serve'],
+  ['Apr', '158600', '36.1', 'North America', 'Enterprise'],
+  ['May', '172300', '37.4', 'Europe', 'Partner'],
+  ['Jun', '189700', '39.8', 'Asia Pacific', 'Enterprise'],
+].map(([month, revenue, margin, region, channel], index) => ({
+  id: `demo-${index + 1}`,
+  source: 'Executive revenue demo',
+  fields: { month, revenue, margin, region, channel },
+  color: '#7c3aed',
+}))
 
 export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
   const [loading, setLoading] = useState<string | null>(null)
@@ -52,7 +66,10 @@ export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center px-4 py-16 transition-colors ${dk ? 'bg-[#09090b]' : 'bg-white'}`}>
+    <main className={`relative min-h-screen overflow-hidden px-4 py-10 sm:py-16 transition-colors ${dk ? 'bg-[#09090b]' : 'bg-[#fcfbff]'}`}>
+      <div aria-hidden="true" className="absolute inset-0 landing-grid opacity-50" />
+      <div aria-hidden="true" className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="relative mx-auto flex max-w-6xl flex-col items-center">
 
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8 animate-fade-in-up" style={{ animationDelay: '0s' }}>
@@ -60,19 +77,22 @@ export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
           <Sparkles size={20} className="text-white" />
         </div>
         <div>
-          <h1 className={`text-lg font-bold ${dk ? 'text-zinc-100' : 'text-zinc-900'}`}>DataInsight AI</h1>
-          <p className={`text-xs ${dk ? 'text-zinc-500' : 'text-zinc-400'}`}>Instant analytics + AI-powered insights</p>
+          <h1 className={`text-lg font-bold ${dk ? 'text-zinc-100' : 'text-zinc-900'}`}>InsightBridge AI</h1>
+          <p className={`text-xs ${dk ? 'text-zinc-500' : 'text-zinc-500'}`}>Decision intelligence, without the busywork</p>
         </div>
       </div>
 
       {/* Hero */}
-      <div className="text-center max-w-xl animate-fade-in-up" style={{ animationDelay: '0.06s' }}>
-        <h2 className={`text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-4 ${dk ? 'text-zinc-100' : 'text-zinc-900'}`}>
-          Understand your data{' '}
-          <span className="bg-gradient-to-r from-violet-500 to-purple-400 bg-clip-text text-transparent">instantly</span>
+      <div className="text-center max-w-3xl animate-fade-in-up" style={{ animationDelay: '0.06s' }}>
+        <div className={`mx-auto mb-5 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${dk ? 'border-violet-500/20 bg-violet-500/10 text-violet-300' : 'border-violet-200 bg-violet-50 text-violet-700'}`}>
+          <Zap size={12} /> Browser-native analytics in seconds
+        </div>
+        <h2 className={`text-4xl sm:text-6xl font-extrabold tracking-[-0.04em] leading-[1.05] mb-5 ${dk ? 'text-zinc-100' : 'text-zinc-950'}`}>
+          From raw data to{' '}
+          <span className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-500 bg-clip-text text-transparent">clear decisions.</span>
         </h2>
         <p className={`text-base leading-relaxed mb-8 ${dk ? 'text-zinc-400' : 'text-zinc-500'}`}>
-          Upload any CSV or JSON file, or pull from a live API. Get automatic statistical analysis, AI-generated expert insights, interactive charts, and a searchable data table — in seconds.
+          Profile a dataset, surface the signals that matter, and ask better questions—without spreadsheets, setup, or sending your file to a server.
         </p>
 
         {/* Primary CTA: Upload */}
@@ -93,8 +113,15 @@ export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
           <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
         </button>
 
+        <button
+          onClick={() => onDataLoaded(DEMO_RECORDS, '📈 Executive revenue demo')}
+          className={`group ml-0 sm:ml-3 inline-flex items-center gap-2 px-6 py-4 rounded-2xl border text-sm font-bold transition-all hover:-translate-y-0.5 ${dk ? 'border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:border-violet-600' : 'border-zinc-200 bg-white text-zinc-800 shadow-sm hover:border-violet-300 hover:shadow-md'}`}
+        >
+          <BarChart3 size={17} /> Explore the demo
+        </button>
+
         <p className={`text-xs mb-1 ${dk ? 'text-zinc-600' : 'text-zinc-400'}`}>
-          Files processed in your browser — nothing uploaded to any server
+          <ShieldCheck size={12} className="inline mr-1" /> Your uploaded files stay in this browser
         </p>
       </div>
 
@@ -174,6 +201,8 @@ export function LandingView({ isDark: dk, onOpenImport, onDataLoaded }: Props) {
           </div>
         ))}
       </div>
-    </div>
+      <p className={`mt-8 text-center text-[11px] ${dk ? 'text-zinc-700' : 'text-zinc-400'}`}>No account required · Works with CSV and JSON · AI is optional</p>
+      </div>
+    </main>
   )
 }

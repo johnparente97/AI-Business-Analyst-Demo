@@ -43,7 +43,10 @@ export const useAppStore = create<AppState>((set) => ({
   records: [],
   source: null,
   isDataPanelOpen: false,
-  isDarkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
+  isDarkMode: (() => {
+    const saved = localStorage.getItem('insightbridge-theme')
+    return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+  })(),
   llmConfig: loadLLMConfig(),
   aiInsights: '',
   aiError: null,
@@ -59,6 +62,7 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       const next = !s.isDarkMode
       document.body.classList.toggle('dark', next)
+      localStorage.setItem('insightbridge-theme', next ? 'dark' : 'light')
       return { isDarkMode: next }
     }),
   setLLMConfig: (config) => {
