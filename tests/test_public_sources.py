@@ -58,7 +58,7 @@ def test_fetch_cdc_data_success(mock_get):
     ]
     mock_get.return_value = mock_resp
 
-    df, metadata = fetch_cdc_data("U.S. Chronic Disease Indicators (CDI)", limit=10)
+    df, metadata = fetch_cdc_data("NCHS - Leading Causes of Death: United States", limit=10)
     assert df is not None
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 2

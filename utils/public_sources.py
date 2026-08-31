@@ -28,6 +28,10 @@ def _get_http_session(
 ) -> requests.Session:
     """Create a requests session with automated retries and backoff."""
     session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 InsightBridgeAI/1.0",
+        "Accept": "application/json, text/csv, */*",
+    })
     retry_strategy = Retry(
         total=retries,
         backoff_factor=backoff_factor,
@@ -59,7 +63,7 @@ SOURCES: List[Dict[str, Any]] = [
         "id": "cdc",
         "name": "CDC Open Data (SODA API)",
         "category": "🏥 Health & Wellness",
-        "description": "U.S. public health datasets — chronic disease indicators, vaccination rates, mortality stats.",
+        "description": "U.S. public health datasets — leading causes of death, obesity, vaccination rates.",
         "url": "https://data.cdc.gov",
         "requires_key": False,
     },
@@ -207,11 +211,11 @@ def fetch_world_bank_data(
 # ─── CDC Open Data (SODA API) ────────────────────────────────────────────────
 
 CDC_DATASETS: Dict[str, str] = {
-    "U.S. Chronic Disease Indicators (CDI)": "g4ie-h725",
-    "COVID-19 Case Surveillance": "vbim-akqf",
+    "NCHS - Leading Causes of Death: United States": "bi63-dtpu",
     "Nutrition, Physical Activity, and Obesity": "hn4x-zwk7",
-    "Behavioral Risk Factor Data (BRFSS - Tobacco Use)": "wsas-xwh5",
-    "National Health Interview Survey (Summary Health)": "fhky-rtsk",
+    "U.S. Vaccination Coverage & Health Survey": "fhky-rtsk",
+    "COVID-19 Hospitalizations and Death Trends": "9bhg-hcku",
+    "Death Rates for U.S. Leading Causes": "w9j2-ggv5",
 }
 
 

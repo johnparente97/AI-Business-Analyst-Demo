@@ -315,6 +315,55 @@ def inject_custom_css() -> None:
             margin: 0 auto;
         }
 
+        /* ─── Developer Artifacts Removal ─── */
+        header[data-testid="stHeader"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+        .stDeployButton {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        [data-testid="stToolbar"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        [data-testid="stDecoration"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        [data-testid="stStatusWidget"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        #MainMenu {
+            visibility: hidden !important;
+        }
+        footer {
+            visibility: hidden !important;
+        }
+
+        /* ─── Sidebar Action Button Styling ─── */
+        section[data-testid="stSidebar"] .stButton > button {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(124, 58, 237, 0.25)) !important;
+            border: 1px solid rgba(0, 212, 255, 0.4) !important;
+            color: #00d4ff !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.03em !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.15) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        section[data-testid="stSidebar"] .stButton > button:hover {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed) !important;
+            color: #0a0e27 !important;
+            border-color: #00d4ff !important;
+            box-shadow: 0 6px 25px rgba(0, 212, 255, 0.4) !important;
+            transform: translateY(-2px) !important;
+        }
+
         /* ─── Animations ─── */
         @keyframes fadeInUp {
             from {
@@ -340,66 +389,47 @@ def inject_custom_css() -> None:
     """, unsafe_allow_html=True)
 
 
+import textwrap
+
+
 def metric_card(title: str, value: str, description: str = "", icon: str = "") -> None:
     """Render a glassmorphic metric card with optional icon and delta text."""
     icon_html = f'<span style="margin-right: 6px;">{icon}</span>' if icon else ""
     desc_html = f'<div class="metric-delta">{description}</div>' if description else ""
-    st.markdown(f"""
-    <div class="metric-card animate-in">
-        <div class="metric-label">{icon_html}{title}</div>
-        <div class="metric-value">{value}</div>
-        {desc_html}
-    </div>
-    """, unsafe_allow_html=True)
+    html = f"""<div class="metric-card animate-in"><div class="metric-label">{icon_html}{title}</div><div class="metric-value">{value}</div>{desc_html}</div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def section_header(title: str, subtitle: str = "") -> None:
     """Render a consistent section header with gradient typography."""
     sub_html = f'<div class="section-subtitle">{subtitle}</div>' if subtitle else ""
-    st.markdown(f"""
-    <div class="section-header animate-in">
-        <h2>{title}</h2>
-        {sub_html}
-    </div>
-    """, unsafe_allow_html=True)
+    html = f"""<div class="section-header animate-in"><h2>{title}</h2>{sub_html}</div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def glass_card(content_html: str) -> None:
     """Render raw HTML content inside a stylized glassmorphic card container."""
-    st.markdown(f"""
-    <div class="glass-card animate-in">
-        {content_html}
-    </div>
-    """, unsafe_allow_html=True)
+    clean_content = textwrap.dedent(content_html).strip()
+    html = f"""<div class="glass-card animate-in">{clean_content}</div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def source_attribution(name: str, url: str) -> None:
     """Render a data source attribution badge with an external hyperlink."""
-    st.markdown(f"""
-    <div class="source-badge">
-        📡 Source: <a href="{url}" target="_blank">{name}</a>
-    </div>
-    """, unsafe_allow_html=True)
+    html = f"""<div class="source-badge">📡 Source: <a href="{url}" target="_blank">{name}</a></div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def empty_state(message: str, icon: str = "📭") -> None:
     """Render an empty state placeholder with an icon and guidance message."""
-    st.markdown(f"""
-    <div class="empty-state animate-in">
-        <div class="empty-state-icon">{icon}</div>
-        <div class="empty-state-text">{message}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    html = f"""<div class="empty-state animate-in"><div class="empty-state-icon">{icon}</div><div class="empty-state-text">{message}</div></div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def hero_header(title: str, subtitle: str) -> None:
     """Render the primary application hero banner."""
-    st.markdown(f"""
-    <div class="animate-in" style="margin-bottom: 32px;">
-        <div class="hero-title">{title}</div>
-        <div class="hero-subtitle">{subtitle}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    html = f"""<div class="animate-in" style="margin-bottom: 32px;"><div class="hero-title">{title}</div><div class="hero-subtitle">{subtitle}</div></div>"""
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ─── Plotly Dark Theme Config ──────────────────────────────────────────────────
