@@ -32,13 +32,14 @@ export interface DataInsights {
   fieldStats: FieldStat[]
   sentences: string[]
   labelField: string  // best field to use as card title/label
+  completenessPct: number
 }
 
 // ─── Main analyzer ────────────────────────────────────────────────────────────
 
 export function analyzeRecords(records: DataRecord[]): DataInsights {
   if (records.length === 0) {
-    return { recordCount: 0, fieldCount: 0, fieldStats: [], sentences: [], labelField: '' }
+    return { recordCount: 0, fieldCount: 0, fieldStats: [], sentences: [], labelField: '', completenessPct: 100 }
   }
 
   const allKeys = Array.from(
@@ -51,6 +52,13 @@ export function analyzeRecords(records: DataRecord[]): DataInsights {
 
   const labelField = chooseLabelField(fieldStats)
   const sentences = generateSentences(fieldStats, records, labelField)
+  const populatedCells = records.reduce(
+    (total, record) => total + allKeys.filter(key => (record.fields[key] ?? '').trim() !== '').length,
+    0
+  )
+  const completenessPct = allKeys.length === 0
+    ? 100
+    : Math.round((populatedCells / (records.length * allKeys.length)) * 100)
 
   return {
     recordCount: records.length,
@@ -58,6 +66,7 @@ export function analyzeRecords(records: DataRecord[]): DataInsights {
     fieldStats,
     sentences,
     labelField,
+    completenessPct,
   }
 }
 

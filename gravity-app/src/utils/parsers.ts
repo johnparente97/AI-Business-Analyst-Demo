@@ -8,24 +8,25 @@
 import type { DataRecord } from '../types/data'
 import { nanoid } from '../utils/nanoid'
 
-const MAX_RECORDS = 500
+export const MAX_RECORDS = 10_000
 
 /**
  * Parse a CSV string into DataRecord[].
  * Handles quoted fields, Windows line endings, empty rows.
  */
 export function parseCSV(text: string, source = 'CSV Upload'): DataRecord[] {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
-  const nonEmpty = lines.filter((l) => l.trim().length > 0)
-  if (nonEmpty.length < 2) throw new Error('CSV must have a header row and at least one data row')
+  const normalized = text.replace(/^\uFEFF/, '')
+  const rows = parseCsvRows(normalized, detectDelimiter(normalized))
+    .filter((row) => row.some((value) => value.trim().length > 0))
+  if (rows.length < 2) throw new Error('CSV must have a header row and at least one data row')
 
   // Parse header
-  const headers = parseCsvRow(nonEmpty[0])
+  const headers = makeUniqueHeaders(rows[0])
   if (headers.length === 0) throw new Error('Could not parse CSV headers')
 
   const records: DataRecord[] = []
-  for (let i = 1; i < Math.min(nonEmpty.length, MAX_RECORDS + 1); i++) {
-    const values = parseCsvRow(nonEmpty[i])
+  for (let i = 1; i < Math.min(rows.length, MAX_RECORDS + 1); i++) {
+    const values = rows[i]
     if (values.length === 0) continue
 
     const fields: Record<string, string> = {}
@@ -33,7 +34,7 @@ export function parseCSV(text: string, source = 'CSV Upload'): DataRecord[] {
       const key = h.trim() || `col${idx + 1}`
       const val = (values[idx] ?? '').trim()
       if (key && val !== undefined) {
-        fields[key] = val.length > 60 ? val.slice(0, 57) + '…' : val
+        fields[key] = val
       }
     })
 
@@ -45,31 +46,67 @@ export function parseCSV(text: string, source = 'CSV Upload'): DataRecord[] {
 }
 
 /**
- * Parse a single CSV row, respecting quoted fields.
+ * Parse CSV rows while respecting escaped quotes and quoted newlines.
  */
-function parseCsvRow(row: string): string[] {
-  const fields: string[] = []
+function detectDelimiter(text: string): string {
+  const counts = new Map([[',', 0], [';', 0], ['\t', 0]])
+  let inQuotes = false
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index]
+    if (character === '"') {
+      if (inQuotes && text[index + 1] === '"') index++
+      else inQuotes = !inQuotes
+    } else if (!inQuotes && (character === '\n' || character === '\r')) {
+      break
+    } else if (!inQuotes && counts.has(character)) {
+      counts.set(character, (counts.get(character) ?? 0) + 1)
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+}
+
+function parseCsvRows(text: string, delimiter: string): string[][] {
+  const rows: string[][] = []
+  let fields: string[] = []
   let current = ''
   let inQuotes = false
 
-  for (let i = 0; i < row.length; i++) {
-    const ch = row[i]
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
     if (ch === '"') {
-      if (inQuotes && row[i + 1] === '"') {
+      if (inQuotes && text[i + 1] === '"') {
         current += '"'
         i++
       } else {
         inQuotes = !inQuotes
       }
-    } else if (ch === ',' && !inQuotes) {
+    } else if (ch === delimiter && !inQuotes) {
       fields.push(current)
       current = ''
+    } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      fields.push(current)
+      rows.push(fields)
+      fields = []
+      current = ''
+      if (ch === '\r' && text[i + 1] === '\n') i++
     } else {
       current += ch
     }
   }
+  if (inQuotes) throw new Error('CSV contains an unterminated quoted field')
   fields.push(current)
-  return fields
+  rows.push(fields)
+  return rows
+}
+
+function makeUniqueHeaders(rawHeaders: string[]): string[] {
+  const seen = new Map<string, number>()
+  return rawHeaders.map((header, index) => {
+    const base = header.trim() || `col${index + 1}`
+    const count = seen.get(base) ?? 0
+    seen.set(base, count + 1)
+    return count === 0 ? base : `${base}_${count + 1}`
+  })
 }
 
 /**
@@ -120,7 +157,7 @@ function extractArray(data: unknown): Record<string, unknown>[] {
 
 /**
  * Flatten a nested object into key: value string pairs.
- * Nested keys use dot notation. Max 8 fields, max 60 char values.
+ * Nested keys use dot notation. Fields and values are preserved for analysis.
  */
 function flattenObject(
   obj: Record<string, unknown>,
@@ -131,7 +168,6 @@ function flattenObject(
   const result: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(obj)) {
-    if (Object.keys(result).length >= 8) break
     const fullKey = prefix ? `${prefix}.${key}` : key
 
     if (
@@ -149,10 +185,10 @@ function flattenObject(
       Object.assign(result, nested)
     } else if (Array.isArray(value)) {
       const str = value.slice(0, 3).join(', ')
-      result[fullKey] = str.length > 60 ? str.slice(0, 57) + '…' : str
+      result[fullKey] = str
     } else if (value !== null && value !== undefined) {
       const str = String(value)
-      result[fullKey] = str.length > 60 ? str.slice(0, 57) + '…' : str
+      result[fullKey] = str
     }
   }
 
