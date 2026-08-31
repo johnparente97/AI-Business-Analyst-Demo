@@ -2,16 +2,16 @@ interface StatPillsProps {
   recordsCount: number
   fieldCount: number
   numericCount: number
-  catCount: number
+  completenessPct: number
 }
 
-export function StatPills({ recordsCount, fieldCount, numericCount, catCount }: StatPillsProps) {
+export function StatPills({ recordsCount, fieldCount, numericCount, completenessPct }: StatPillsProps) {
   return (
     <div className="grid grid-cols-4 gap-3">
       <StatPill label="Records" value={recordsCount} color="violet" />
       <StatPill label="Fields" value={fieldCount} color="blue" />
       <StatPill label="Numeric" value={numericCount} color="emerald" />
-      <StatPill label="Category" value={catCount} color="amber" />
+      <StatPill label="Complete %" value={completenessPct} color="amber" />
     </div>
   )
 }

@@ -43,6 +43,21 @@ body.dark {
   color: #e0e0f0;
 }
 
+.landing-grid {
+  background-image:
+    linear-gradient(rgba(124, 58, 237, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.055) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid rgba(139, 92, 246, 0.55);
+  outline-offset: 3px;
+}
+
 /* ─── Physics element overlay ───────────────────────── */
 .physics-element {
   /* When physics is active, elements are taken out of flow */

@@ -49,7 +49,7 @@ export function Dashboard({ records, source, insights, isDark, onChangeData }: D
               recordsCount={records.length}
               fieldCount={insights.fieldCount}
               numericCount={numericFields.length}
-              catCount={catFields.length}
+              completenessPct={insights.completenessPct}
             />
 
             {numericFields.length > 0 && (

@@ -12,7 +12,7 @@ import {
   X, Upload, Globe, Table, RefreshCw, ChevronRight,
   FileText, Link, Trash2, Play, AlertCircle, Check,
 } from 'lucide-react'
-import { parseCSV, parseJSON } from '../utils/parsers'
+import { parseCSV, parseJSON, MAX_RECORDS } from '../utils/parsers'
 import { fetchPreset, fetchFromUrl, DATA_PRESETS } from '../utils/fetcher'
 import type { DataRecord } from '../types/data'
 
@@ -58,6 +58,10 @@ export function DataImportPanel({
 
   const processFile = useCallback(async (file: File) => {
     setParseError(null)
+    if (file.size > 25 * 1024 * 1024) {
+      setParseError('This file is larger than 25 MB. Reduce or split it before importing.')
+      return
+    }
     const isCSV = file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv'
     const isJSON = file.name.toLowerCase().endsWith('.json') || file.type === 'application/json'
 
@@ -162,6 +166,9 @@ export function DataImportPanel({
 
       {/* Panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-data-title"
         className={`
           relative z-10 w-full sm:max-w-2xl sm:mx-4
           rounded-t-3xl sm:rounded-3xl flex flex-col
@@ -175,7 +182,7 @@ export function DataImportPanel({
         {/* Header */}
         <div className={`flex items-center justify-between px-6 pt-6 pb-4 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
           <div>
-            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h2 id="import-data-title" className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Import Data
             </h2>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -195,17 +202,18 @@ export function DataImportPanel({
 
         {/* Tab bar */}
         <div className={`flex gap-1 px-6 py-3 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-          <button className={tabClass('upload')} onClick={() => setActiveTab('upload')}>
+          <button className={tabClass('upload')} onClick={() => setActiveTab('upload')} aria-pressed={activeTab === 'upload'}>
             <Upload size={14} />
             <span>Upload</span>
           </button>
-          <button className={tabClass('online')} onClick={() => setActiveTab('online')}>
+          <button className={tabClass('online')} onClick={() => setActiveTab('online')} aria-pressed={activeTab === 'online'}>
             <Globe size={14} />
             <span>Online</span>
           </button>
           <button
             className={tabClass('preview')}
             onClick={() => setActiveTab('preview')}
+            aria-pressed={activeTab === 'preview'}
           >
             <Table size={14} />
             <span>Preview</span>
@@ -254,7 +262,7 @@ export function DataImportPanel({
                     or <span className="text-purple-500 font-medium">click to browse</span>
                   </p>
                   <p className={`text-xs mt-2 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-                    Supports .CSV and .JSON • Up to 15 rows displayed
+                    CSV or JSON • Up to 25 MB and {MAX_RECORDS.toLocaleString()} records
                   </p>
                 </div>
                 <input
@@ -463,14 +471,14 @@ export function DataImportPanel({
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${isDark ? 'divide-gray-800' : 'divide-gray-100'}`}>
-                          {previewRecords.map((record, i) => (
+                          {previewRecords.slice(0, 100).map((record, i) => (
                             <tr key={record.id} className={i % 2 === 0
                               ? isDark ? 'bg-gray-900' : 'bg-white'
                               : isDark ? 'bg-gray-800/50' : 'bg-gray-50/50'
                             }>
-                              {Object.values(record.fields).slice(0, 5).map((val, j) => (
-                                <td key={j} className={`px-3 py-2 truncate max-w-32 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                  {val}
+                              {Object.keys(previewRecords[0]?.fields ?? {}).slice(0, 5).map((key) => (
+                                <td key={key} className={`px-3 py-2 truncate max-w-32 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {record.fields[key] || '—'}
                                 </td>
                               ))}
                             </tr>
@@ -479,6 +487,11 @@ export function DataImportPanel({
                       </table>
                     </div>
                   </div>
+                  {previewRecords.length > 100 && (
+                    <p className={`text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Previewing the first 100 of {previewRecords.length.toLocaleString()} records. All records will be analyzed.
+                    </p>
+                  )}
                 </>
               )}
             </div>
