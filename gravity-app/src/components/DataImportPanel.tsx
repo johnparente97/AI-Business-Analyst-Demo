@@ -162,6 +162,9 @@ export function DataImportPanel({
 
       {/* Panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-data-title"
         className={`
           relative z-10 w-full sm:max-w-2xl sm:mx-4
           rounded-t-3xl sm:rounded-3xl flex flex-col
@@ -175,7 +178,7 @@ export function DataImportPanel({
         {/* Header */}
         <div className={`flex items-center justify-between px-6 pt-6 pb-4 border-b ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
           <div>
-            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h2 id="import-data-title" className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Import Data
             </h2>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -195,17 +198,18 @@ export function DataImportPanel({
 
         {/* Tab bar */}
         <div className={`flex gap-1 px-6 py-3 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
-          <button className={tabClass('upload')} onClick={() => setActiveTab('upload')}>
+          <button className={tabClass('upload')} onClick={() => setActiveTab('upload')} aria-pressed={activeTab === 'upload'}>
             <Upload size={14} />
             <span>Upload</span>
           </button>
-          <button className={tabClass('online')} onClick={() => setActiveTab('online')}>
+          <button className={tabClass('online')} onClick={() => setActiveTab('online')} aria-pressed={activeTab === 'online'}>
             <Globe size={14} />
             <span>Online</span>
           </button>
           <button
             className={tabClass('preview')}
             onClick={() => setActiveTab('preview')}
+            aria-pressed={activeTab === 'preview'}
           >
             <Table size={14} />
             <span>Preview</span>

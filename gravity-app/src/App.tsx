@@ -1,5 +1,5 @@
 /**
- * App — DataInsight AI
+ * App — InsightBridge AI
  *
  * Clean 2-screen flow:
  *   Landing  → import data
@@ -75,8 +75,9 @@ export default function App() {
             : 'bg-white border-gray-200 shadow-sm hover:shadow-md'
           }
         `}
-        title="Toggle dark mode"
-        aria-label="Toggle dark mode"
+        title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+        aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+        aria-pressed={isDarkMode}
       >
         {isDarkMode ? '☀️' : '🌙'}
       </button>
