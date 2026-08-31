@@ -1,119 +1,142 @@
-import pandas as pd
-import streamlit as st
-import numpy as np
+"""
+InsightBridge AI — High-Performance Streaming Data Loader
+Processes datasets up to 200MB in chunked streaming fashion to prevent memory exhaustion.
+"""
+from __future__ import annotations
+
 from collections import Counter
+from datetime import datetime, timedelta
 import io
 import random
-from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
-def generate_synthetic_csv():
+import numpy as np
+import pandas as pd
+
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
+
+def generate_synthetic_csv() -> io.BytesIO:
     """
-    Generates a realistic retail sales dataset as an in-memory CSV buffer.
+    Generate a realistic enterprise retail sales dataset as an in-memory CSV buffer.
+
+    Returns:
+        io.BytesIO: In-memory buffer containing the synthetic CSV data.
     """
     rows = 5000
-    
+
     # 1. Date Range (Last 6 months)
     end_date = datetime.now()
-    dates = [(end_date - timedelta(days=x)).strftime('%Y-%m-%d') for x in range(180)]
+    dates = [(end_date - timedelta(days=x)).strftime("%Y-%m-%d") for x in range(180)]
     col_dates = [random.choice(dates) for _ in range(rows)]
-    
+
     # 2. Categories
-    categories = ['Electronics', 'Home & Garden', 'Fashion', 'Sports', 'Beauty']
+    categories = ["Electronics", "Home & Garden", "Fashion", "Sports", "Beauty"]
     col_cats = [random.choice(categories) for _ in range(rows)]
-    
+
     # 3. Regions
-    regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America']
+    regions = ["North America", "Europe", "Asia Pacific", "Latin America"]
     col_regions = [random.choice(regions) for _ in range(rows)]
-    
+
     # 4. Metrics (Sales, Profit)
     col_sales = [round(random.uniform(50.0, 1500.0), 2) for _ in range(rows)]
     col_profit = [round(s * random.uniform(0.1, 0.4), 2) for s in col_sales]
-    
-    # Create DataFrame
+
     df = pd.DataFrame({
-        'Date': col_dates,
-        'Category': col_cats,
-        'Region': col_regions,
-        'Sales Amount': col_sales,
-        'Profit': col_profit
+        "Date": col_dates,
+        "Category": col_cats,
+        "Region": col_regions,
+        "Sales Amount": col_sales,
+        "Profit": col_profit,
     })
-    
-    # Intentionally add some missing values to test quality checks
+
+    # Intentionally add sparse missing values for testing data quality routines
     mask = np.random.choice([True, False], size=rows, p=[0.02, 0.98])
-    df.loc[mask, 'Region'] = np.nan
-    
-    # Return as BytesIO
+    df.loc[mask, "Region"] = np.nan
+
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
-    buffer.name = "sample_retail_data.csv" # Mock filename
+    buffer.name = "sample_retail_data.csv"
     return buffer
 
-def process_uploaded_file(uploaded_file):
+
+def process_uploaded_file(uploaded_file: Any) -> Optional[Dict[str, Any]]:
     """
-    Reads a CSV file in chunks and computes aggregated statistics and visualization data.
-    Returns a dictionary containing the analysis results.
+    Read a CSV file in chunked streams and compute aggregate statistics and time series data.
+
+    Args:
+        uploaded_file: Streamlit UploadedFile or file-like object.
+
+    Returns:
+        Optional[Dict[str, Any]]: Summary dictionary with statistics, or None if processing fails.
     """
-    CHUNK_SIZE = 100_000
-    
-    # Initialize accumulators
-    summary = {
+    chunk_size = 100_000
+
+    summary: Dict[str, Any] = {
         "rows": 0,
         "cols": 0,
-        "column_info": {}, # {name: dtype}
-        "numeric_stats": {}, # {col: {min, max, sum, sum_sq, count, missing}}
-        "categorical_stats": {}, # {col: Counter()}
-        "missing_values": {}, # {col: count}
+        "column_info": {},
+        "numeric_stats": {},
+        "categorical_stats": {},
+        "missing_values": {},
         "total_missing": 0,
         "date_col": None,
-        "trend_data": {}, # {date_str: count}
-        "trend_type": None, # 'daily' or 'raw'
-        "sample_data": None # First few rows for preview
+        "trend_data": {},
+        "trend_type": None,
+        "sample_data": None,
     }
-    
-    processed_first_chunk = False
-    numeric_cols = []
-    categorical_cols = []
-    date_cols = []
-    
-    # Check total size for progress bar
-    uploaded_file.seek(0, 2)
-    total_size = uploaded_file.tell()
-    uploaded_file.seek(0)
-    
-    progress_bar = st.progress(0, text="Processing data chunks...")
-    chunk_count = 0
-    
-    try:
-        # Iterate through chunks
-        for chunk in pd.read_csv(uploaded_file, chunksize=CHUNK_SIZE):
-            chunk_count += 1
-            # Progress: estimate ~50 chunks for a large file, cap at 95%
-            current_prog = min(chunk_count / 50, 0.95)
-            progress_bar.progress(current_prog, text=f"Processing {summary['rows']:,} rows...")
 
-            # 1. logical type detection (only on first chunk to set schema)
+    processed_first_chunk = False
+    numeric_cols: List[str] = []
+    categorical_cols: List[str] = []
+    date_cols: List[str] = []
+
+    progress_bar = None
+    if st is not None:
+        try:
+            progress_bar = st.progress(0, text="Processing data chunks...")
+        except Exception:
+            progress_bar = None
+
+    chunk_count = 0
+
+    try:
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+
+        for chunk in pd.read_csv(uploaded_file, chunksize=chunk_size):
+            chunk_count += 1
+            if progress_bar is not None:
+                current_prog = min(chunk_count / 50.0, 0.95)
+                progress_bar.progress(current_prog, text=f"Processing {summary['rows']:,} rows...")
+
+            # 1. Schema detection on first chunk
             if not processed_first_chunk:
                 summary["sample_data"] = chunk.head(5)
                 summary["cols"] = len(chunk.columns)
                 summary["column_info"] = {c: str(chunk[c].dtype) for c in chunk.columns}
-                
-                # Detect types
+
                 for col in chunk.columns:
                     if pd.api.types.is_numeric_dtype(chunk[col]):
                         numeric_cols.append(col)
                         summary["numeric_stats"][col] = {
-                            "min": float('inf'), "max": float('-inf'), 
-                            "sum": 0.0, "sum_sq": 0.0, "count": 0, "missing": 0
+                            "min": float("inf"),
+                            "max": float("-inf"),
+                            "sum": 0.0,
+                            "sum_sq": 0.0,
+                            "count": 0,
+                            "missing": 0,
                         }
                     elif pd.api.types.is_datetime64_any_dtype(chunk[col]):
-                         date_cols.append(col)
+                        date_cols.append(col)
                     else:
-                        # Try to detect date strings
                         if "date" in col.lower() or "time" in col.lower():
                             try:
-                                # Test conversion
-                                pd.to_datetime(chunk[col].head(100), errors='raise')
+                                pd.to_datetime(chunk[col].head(100), errors="raise")
                                 date_cols.append(col)
                             except (ValueError, TypeError, pd.errors.ParserError):
                                 categorical_cols.append(col)
@@ -127,82 +150,85 @@ def process_uploaded_file(uploaded_file):
 
                 processed_first_chunk = True
 
-            # 2. Process Numeric Cols
+            # 2. Process numeric columns
             for col in numeric_cols:
-                # Handle missing before conversion
-                n_missing = chunk[col].isna().sum()
-                summary["numeric_stats"][col]["missing"] += int(n_missing)
-                summary["missing_values"][col] = summary["missing_values"].get(col, 0) + int(n_missing)
-                summary["total_missing"] += int(n_missing)
+                n_missing = int(chunk[col].isna().sum())
+                summary["numeric_stats"][col]["missing"] += n_missing
+                summary["missing_values"][col] = summary["missing_values"].get(col, 0) + n_missing
+                summary["total_missing"] += n_missing
 
-                # Operations on valid data
                 valid = chunk[col].dropna()
                 if not valid.empty:
-                    summary["numeric_stats"][col]["min"] = min(summary["numeric_stats"][col]["min"], valid.min())
-                    summary["numeric_stats"][col]["max"] = max(summary["numeric_stats"][col]["max"], valid.max())
-                    s = valid.sum()
+                    summary["numeric_stats"][col]["min"] = min(
+                        summary["numeric_stats"][col]["min"], float(valid.min())
+                    )
+                    summary["numeric_stats"][col]["max"] = max(
+                        summary["numeric_stats"][col]["max"], float(valid.max())
+                    )
+                    s = float(valid.sum())
                     summary["numeric_stats"][col]["sum"] += s
-                    summary["numeric_stats"][col]["sum_sq"] += (valid ** 2).sum()
+                    summary["numeric_stats"][col]["sum_sq"] += float((valid ** 2).sum())
                     summary["numeric_stats"][col]["count"] += len(valid)
 
-            # 3. Process Categorical Cols (Top N tracking)
+            # 3. Process categorical columns with bounded Counter size
             for col in categorical_cols:
-                # Limit memory: only track top 50 values per chunk, then merge? 
-                # Better: just update counter, but prune if it gets too big to avoid OOM on high cardinality
-                counts = chunk[col].value_counts().head(50).to_dict() # Only keep top 50 local
+                counts = chunk[col].value_counts().head(50).to_dict()
                 summary["categorical_stats"][col].update(counts)
-                
-                # Prune global counter to top 50 to prevent unbounded growth
-                if len(summary["categorical_stats"][col]) > 100:
-                    summary["categorical_stats"][col] = Counter(dict(summary["categorical_stats"][col].most_common(50)))
-                    
-                n_missing = chunk[col].isna().sum()
-                summary["missing_values"][col] = summary["missing_values"].get(col, 0) + int(n_missing)
-                summary["total_missing"] += int(n_missing)
 
-            # 4. Process Date/Trend (Volume over time)
+                if len(summary["categorical_stats"][col]) > 100:
+                    summary["categorical_stats"][col] = Counter(
+                        dict(summary["categorical_stats"][col].most_common(50))
+                    )
+
+                n_missing = int(chunk[col].isna().sum())
+                summary["missing_values"][col] = summary["missing_values"].get(col, 0) + n_missing
+                summary["total_missing"] += n_missing
+
+            # 4. Process temporal trend aggregation
             if summary["date_col"]:
                 d_col = summary["date_col"]
-                # Convert to datetime
-                dates = pd.to_datetime(chunk[d_col], errors='coerce').dropna()
+                dates = pd.to_datetime(chunk[d_col], errors="coerce").dropna()
                 if not dates.empty:
-                    # Resample to Daily counts
-                    daily_counts = dates.dt.floor('D').value_counts()
+                    daily_counts = dates.dt.floor("D").value_counts()
                     for date_val, count in daily_counts.items():
-                        d_str = date_val.strftime('%Y-%m-%d')
-                        summary["trend_data"][d_str] = summary["trend_data"].get(d_str, 0) + count
+                        d_str = date_val.strftime("%Y-%m-%d")
+                        summary["trend_data"][d_str] = summary["trend_data"].get(d_str, 0) + int(count)
 
             summary["rows"] += len(chunk)
 
-        # Post-Processing
-        progress_bar.progress(1.0, text="Finalizing analysis...")
-        
-        # Calculate Final Numeric Stats (Mean, Std)
+        if progress_bar is not None:
+            progress_bar.progress(1.0, text="Finalizing analysis...")
+
+        # Calculate final numeric stats (mean, std)
         for col in numeric_cols:
             stats = summary["numeric_stats"][col]
             if stats["count"] > 0:
                 stats["mean"] = stats["sum"] / stats["count"]
-                # Variance = (SumSq - (Sum^2)/N) / N
-                variance = (stats["sum_sq"] - (stats["sum"]**2)/stats["count"]) / stats["count"]
-                stats["std"] = np.sqrt(variance) if variance > 0 else 0.0
+                variance = max(0.0, (stats["sum_sq"] - (stats["sum"] ** 2) / stats["count"]) / stats["count"])
+                stats["std"] = float(np.sqrt(variance))
             else:
-                stats["mean"] = 0
-                stats["std"] = 0
+                stats["mean"] = 0.0
+                stats["std"] = 0.0
 
-        # Sort Trend Data
+        # Sort trend data
         if summary["trend_data"]:
-             sorted_dates = sorted(summary["trend_data"].keys())
-             summary["trend_sorted"] = {k: summary["trend_data"][k] for k in sorted_dates}
-             # determine range
-             summary["date_range"] = f"{sorted_dates[0]} to {sorted_dates[-1]}"
+            sorted_dates = sorted(summary["trend_data"].keys())
+            summary["trend_sorted"] = {k: summary["trend_data"][k] for k in sorted_dates}
+            summary["date_range"] = f"{sorted_dates[0]} to {sorted_dates[-1]}"
         else:
             summary["date_range"] = "N/A"
             summary["trend_sorted"] = {}
 
-        progress_bar.empty()
+        if progress_bar is not None:
+            progress_bar.empty()
         return summary
 
     except Exception as e:
-        progress_bar.empty()
-        st.error(f"Error processing file: {e}")
+        if progress_bar is not None:
+            progress_bar.empty()
+        if st is not None:
+            try:
+                st.error(f"Error processing file: {e}")
+            except Exception:
+                pass
         return None

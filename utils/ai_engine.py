@@ -1,30 +1,78 @@
 """
 InsightBridge AI — AI Analysis Engine
-Multi-provider LLM integration with strong rule-based fallback.
-Supports: HuggingFace, OpenAI-compatible APIs, and offline mode.
+Multi-provider LLM integration with caching, retry resiliency, and robust rule-based fallback.
+Supports: OpenAI-compatible APIs, Hugging Face Inference API, and offline mode.
 """
-import requests
-import streamlit as st
+from __future__ import annotations
+
+import functools
+import hashlib
 import json
+import logging
+import os
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
 import pandas as pd
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
+# Attempt to load local .env if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
+logger = logging.getLogger(__name__)
+
+
+def _create_resilient_session(
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    status_forcelist: tuple[int, ...] = (429, 500, 502, 503, 504),
+) -> requests.Session:
+    """Create and configure a requests.Session with exponential backoff retries."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=["GET", "POST"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 class AIEngine:
     """
     AI-powered analysis engine for datasets.
-    Falls back to comprehensive rule-based analysis when no API key is available.
+    Provides automated domain detection, executive synthesis, and deep-dive analysis.
+    Falls back to deterministic rule-based analysis when no LLM API key is configured.
     """
 
-    def __init__(self):
-        self.provider = self._detect_provider()
-        self.api_token = None
-        self.api_url = None
+    def __init__(self) -> None:
+        """Initialize the AI engine with provider detection, credentials, and network session."""
+        self.provider: str = self._detect_provider()
+        self.api_token: Optional[str] = None
+        self.api_url: Optional[str] = None
+        self.model: Optional[str] = None
+        self._session: requests.Session = _create_resilient_session()
+        self._cache: Dict[str, Any] = {}
 
         if self.provider == "openai":
             self.api_token = self._get_secret("OPENAI_API_KEY")
             self.api_url = self._get_secret("OPENAI_BASE_URL", "https://api.openai.com/v1")
-            self.model = self._get_secret("OPENAI_MODEL", "gpt-3.5-turbo")
+            self.model = self._get_secret("OPENAI_MODEL", "gpt-4o-mini")
         elif self.provider == "huggingface":
             self.api_token = self._get_secret("HF_API_TOKEN")
             self.api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
@@ -32,8 +80,13 @@ class AIEngine:
     # ─── Provider Detection ───────────────────────────────────────────────────
 
     def _detect_provider(self) -> str:
-        """Auto-detect which LLM provider is configured."""
-        explicit = self._get_secret("LLM_PROVIDER", "").lower()
+        """
+        Auto-detect which LLM provider is configured in environment or Streamlit secrets.
+
+        Returns:
+            str: 'openai', 'huggingface', or 'fallback'.
+        """
+        explicit = (self._get_secret("LLM_PROVIDER") or "").strip().lower()
         if explicit in ("openai", "huggingface"):
             return explicit
         if self._get_secret("OPENAI_API_KEY"):
@@ -43,72 +96,135 @@ class AIEngine:
         return "fallback"
 
     @staticmethod
-    def _get_secret(key: str, default: str = None):
-        """Safely retrieve a secret from Streamlit secrets or environment."""
-        import os
-        try:
-            return st.secrets.get(key, None) or os.environ.get(key, default)
-        except Exception:
-            import os
-            return os.environ.get(key, default)
+    def _get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
+        """
+        Safely retrieve a secret from Streamlit secrets or environment variables.
+
+        Args:
+            key: Secret configuration name.
+            default: Default value if key is not found.
+
+        Returns:
+            Optional[str]: Retrieved configuration value or default.
+        """
+        if st is not None:
+            try:
+                secret_val = st.secrets.get(key, None)
+                if secret_val:
+                    return str(secret_val)
+            except Exception:
+                pass
+        return os.environ.get(key, default)
+
+    # ─── Caching Helpers ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _compute_hash(content: str) -> str:
+        """Compute SHA256 digest for cache keys."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     # ─── Public Analysis Methods ──────────────────────────────────────────────
 
-    def analyze_dataset_context(self, summary_data: dict) -> dict:
+    def analyze_dataset_context(self, summary_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Phase 1 assessment: Domain, synthesis, variable intelligence, signals.
-        Compatible with the legacy data loader summary format.
+        Phase 1 assessment: Domain classification, synthesis, variable intelligence, and key signals.
+
+        Args:
+            summary_data: Dictionary containing statistical summary of the uploaded data.
+
+        Returns:
+            Dict[str, Any]: Structured intelligence dictionary with domain, synthesis, and signals.
         """
         if self.provider != "fallback":
             try:
                 prompt = self._build_context_prompt(summary_data)
+                cache_key = f"ctx_{self._compute_hash(prompt)}"
+                if cache_key in self._cache:
+                    return self._cache[cache_key]
+
                 raw = self._call_llm(prompt)
                 parsed = self._parse_json_response(raw, summary_data)
                 if parsed:
+                    self._cache[cache_key] = parsed
                     return parsed
             except Exception as e:
-                print(f"LLM Error (analyze_dataset_context): {e}")
+                logger.warning("LLM call failed for dataset context: %s. Falling back to rule-based engine.", e)
         return self._generate_fallback_analysis(summary_data)
 
-    def deep_dive_analysis(self, df: pd.DataFrame, profile: dict, question: str = "") -> dict:
+    def deep_dive_analysis(
+        self,
+        df: pd.DataFrame,
+        profile: Dict[str, Any],
+        question: str = "",
+    ) -> Dict[str, Any]:
         """
-        Generate a deep-dive analysis of the dataset.
-        Returns a dict with: summary, trends, implications, limitations, questions, sources.
+        Generate a deep-dive analysis of the dataset with trends, implications, and anomaly findings.
+
+        Args:
+            df: The active pandas DataFrame.
+            profile: Profile dictionary generated by generate_full_profile().
+            question: Optional specific business question from the user.
+
+        Returns:
+            Dict[str, Any]: Structured deep-dive report containing summary, trends, and recommendations.
         """
         context = self._build_deep_dive_context(df, profile)
-
         if question:
             context += f"\n\nUSER QUESTION: {question}"
 
         if self.provider != "fallback":
             try:
                 prompt = self._build_deep_dive_prompt(context)
+                cache_key = f"dd_{self._compute_hash(prompt)}"
+                if cache_key in self._cache:
+                    return self._cache[cache_key]
+
                 raw = self._call_llm(prompt)
                 parsed = self._parse_deep_dive_response(raw)
                 if parsed:
+                    self._cache[cache_key] = parsed
                     return parsed
             except Exception as e:
-                print(f"LLM Error (deep_dive): {e}")
+                logger.warning("LLM call failed for deep dive: %s. Falling back to rule-based engine.", e)
 
         return self._generate_fallback_deep_dive(df, profile, question)
 
-    def generate_executive_summary(self, df: pd.DataFrame, profile: dict) -> str:
-        """Generate a complete executive summary as Markdown text."""
+    def generate_executive_summary(self, df: pd.DataFrame, profile: Dict[str, Any]) -> str:
+        """
+        Generate a complete executive summary report formatted in GitHub-Flavored Markdown.
+
+        Args:
+            df: The active pandas DataFrame.
+            profile: Profile dictionary generated by generate_full_profile().
+
+        Returns:
+            str: Markdown-formatted executive summary text.
+        """
         context = self._build_deep_dive_context(df, profile)
 
         if self.provider != "fallback":
             try:
                 prompt = self._build_exec_summary_prompt(context)
+                cache_key = f"exec_{self._compute_hash(prompt)}"
+                if cache_key in self._cache:
+                    return self._cache[cache_key]
+
                 raw = self._call_llm(prompt)
                 if raw and len(raw) > 50:
+                    self._cache[cache_key] = raw
                     return raw
             except Exception as e:
-                print(f"LLM Error (exec_summary): {e}")
+                logger.warning("LLM call failed for executive summary: %s. Falling back to rule-based engine.", e)
 
         return self._generate_fallback_executive_summary(df, profile)
 
-    def get_provider_status(self) -> dict:
-        """Return current provider status for UI display."""
+    def get_provider_status(self) -> Dict[str, str]:
+        """
+        Return current provider status for UI display.
+
+        Returns:
+            Dict[str, str]: Status details with provider, label, and descriptive status.
+        """
         return {
             "provider": self.provider,
             "label": {
@@ -117,7 +233,7 @@ class AIEngine:
                 "fallback": "⚪ Offline (Rule-Based Analysis)",
             }.get(self.provider, "⚪ Offline"),
             "description": {
-                "openai": "Full AI analysis powered by OpenAI",
+                "openai": f"Full AI analysis powered by OpenAI ({self.model or 'gpt-4o-mini'})",
                 "huggingface": "AI analysis via HuggingFace Inference API",
                 "fallback": "Statistical analysis without LLM — add an API key for AI insights",
             }.get(self.provider, ""),
@@ -126,7 +242,15 @@ class AIEngine:
     # ─── LLM Call Dispatchers ─────────────────────────────────────────────────
 
     def _call_llm(self, prompt: str) -> str:
-        """Route to the correct API based on provider."""
+        """
+        Route prompt to the active provider API.
+
+        Args:
+            prompt: Text prompt to send to the model.
+
+        Returns:
+            str: Raw generated text response.
+        """
         if self.provider == "openai":
             return self._call_openai(prompt)
         elif self.provider == "huggingface":
@@ -134,7 +258,7 @@ class AIEngine:
         return ""
 
     def _call_openai(self, prompt: str) -> str:
-        """Call an OpenAI-compatible API."""
+        """Call an OpenAI-compatible API endpoint with timeout and error handling."""
         headers = {
             "Authorization": f"Bearer {self.api_token}",
             "Content-Type": "application/json",
@@ -142,29 +266,38 @@ class AIEngine:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "You are a Senior Principal Data Analyst. Be precise, factual, and concise. Never invent facts. Clearly separate observations from assumptions."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a Senior Principal Data Analyst. Be precise, factual, and concise. "
+                        "Never invent facts. Clearly separate observations from assumptions."
+                    ),
+                },
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.3,
+            "temperature": 0.2,
             "max_tokens": 1500,
         }
 
-        resp = requests.post(
+        resp = self._session.post(
             f"{self.api_url}/chat/completions",
-            headers=headers, json=payload, timeout=30
+            headers=headers,
+            json=payload,
+            timeout=30,
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
 
     def _call_huggingface(self, prompt: str) -> str:
-        """Call the HuggingFace Inference API."""
+        """Call the HuggingFace Inference API with timeout and validation."""
         headers = {"Authorization": f"Bearer {self.api_token}"}
         payload = {
             "inputs": f"[INST] {prompt} [/INST]",
             "parameters": {"max_new_tokens": 1200, "temperature": 0.2, "return_full_text": False},
         }
 
-        resp = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
+        resp = self._session.post(self.api_url, headers=headers, json=payload, timeout=30)
         resp.raise_for_status()
         result = resp.json()
         if isinstance(result, list) and len(result) > 0:
@@ -173,9 +306,9 @@ class AIEngine:
 
     # ─── Prompt Builders ──────────────────────────────────────────────────────
 
-    def _build_context_prompt(self, data: dict) -> str:
-        """Build the dataset context analysis prompt."""
-        info = f"Dataset: {data['rows']:,} rows, {data['cols']} columns.\n"
+    def _build_context_prompt(self, data: Dict[str, Any]) -> str:
+        """Build the dataset context analysis prompt from statistical metadata."""
+        info = f"Dataset: {data.get('rows', 0):,} rows, {data.get('cols', 0)} columns.\n"
         if data.get("date_range", "N/A") != "N/A":
             info += f"Date Range: {data['date_range']}.\n"
 
@@ -189,7 +322,13 @@ class AIEngine:
         for i, (col, counter) in enumerate(data.get("categorical_stats", {}).items()):
             if i >= 5:
                 break
-            top_3 = ", ".join([str(k) for k, v in counter.most_common(3)])
+            if hasattr(counter, "most_common"):
+                top_items = counter.most_common(3)
+            elif isinstance(counter, dict):
+                top_items = sorted(counter.items(), key=lambda x: x[1], reverse=True)[:3]
+            else:
+                top_items = []
+            top_3 = ", ".join([str(k) for k, _ in top_items])
             cat_str += f"- {col}: {top_3}\n"
 
         all_cols = list(data.get("numeric_stats", {}).keys()) + list(data.get("categorical_stats", {}).keys())
@@ -208,7 +347,7 @@ KEY CATEGORIES:
 
 Return a valid JSON object with this structure:
 {{
-  "domain": "String (e.g., Retail, Finance)",
+  "domain": "String (e.g., Retail, Finance, Healthcare, Operations)",
   "executive_synthesis": {{
     "observation": "2 sentences describing what the data represents structurally.",
     "implication": "2 sentences explaining the strategic value or potential risk."
@@ -222,8 +361,8 @@ Return a valid JSON object with this structure:
 
 Be decisive. Classify variables by their likely business use. Return raw JSON only."""
 
-    def _build_deep_dive_context(self, df: pd.DataFrame, profile: dict) -> str:
-        """Build context string from DataFrame and profile."""
+    def _build_deep_dive_context(self, df: pd.DataFrame, profile: Dict[str, Any]) -> str:
+        """Build context string from DataFrame and profile dictionary."""
         shape = profile.get("shape", {})
         missing = profile.get("missing_summary", {})
         dups = profile.get("duplicates", {})
@@ -321,30 +460,29 @@ RULES:
 
     # ─── Response Parsers ─────────────────────────────────────────────────────
 
-    def _parse_json_response(self, text: str, summary_data: dict) -> dict:
-        """Parse JSON from LLM response text."""
+    def _parse_json_response(self, text: str, summary_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse and validate JSON from LLM response text."""
         try:
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0]
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
-            if "{" in text:
+            if "{" in text and "}" in text:
                 text = text[text.find("{"):text.rfind("}") + 1]
             return json.loads(text)
         except (json.JSONDecodeError, ValueError, KeyError, IndexError):
             return None
 
-    def _parse_deep_dive_response(self, text: str) -> dict:
-        """Parse deep dive JSON response."""
+    def _parse_deep_dive_response(self, text: str) -> Optional[Dict[str, Any]]:
+        """Parse and validate deep dive JSON response."""
         try:
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0]
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
-            if "{" in text:
+            if "{" in text and "}" in text:
                 text = text[text.find("{"):text.rfind("}") + 1]
             result = json.loads(text)
-            # Validate expected keys
             required = ["summary", "trends", "business_implications"]
             if any(k in result for k in required):
                 return result
@@ -354,12 +492,11 @@ RULES:
 
     # ─── Fallback Analysis (Rule-Based) ───────────────────────────────────────
 
-    def _generate_fallback_analysis(self, data: dict) -> dict:
+    def _generate_fallback_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Comprehensive rule-based dataset analysis when no LLM is available."""
         cols = list(data.get("numeric_stats", {}).keys()) + list(data.get("categorical_stats", {}).keys())
         cols_str = " ".join(cols).lower()
 
-        # Domain detection heuristics
         domain = "General Operations"
         if any(x in cols_str for x in ["sales", "revenue", "price", "cost", "profit", "margin"]):
             domain = "Financial / Retail"
@@ -372,22 +509,33 @@ RULES:
         elif any(x in cols_str for x in ["click", "impression", "conversion", "campaign"]):
             domain = "Marketing / Advertising"
 
-        # Variable intelligence
         var_intel = []
         if data.get("date_col"):
-            var_intel.append({"column": data["date_col"], "role": "Temporal (Time)", "description": "Primary timeline for trend analysis."})
+            var_intel.append({
+                "column": data["date_col"],
+                "role": "Temporal (Time)",
+                "description": "Primary timeline for trend analysis.",
+            })
         for col in list(data.get("numeric_stats", {}).keys())[:3]:
-            var_intel.append({"column": col, "role": "Metric (KPI)", "description": "Key numeric performance indicator."})
+            var_intel.append({
+                "column": col,
+                "role": "Metric (KPI)",
+                "description": "Key numeric performance indicator.",
+            })
         for col in list(data.get("categorical_stats", {}).keys())[:2]:
-            var_intel.append({"column": col, "role": "Segment (Dimension)", "description": "Categorical grouping factor."})
+            var_intel.append({
+                "column": col,
+                "role": "Segment (Dimension)",
+                "description": "Categorical grouping factor.",
+            })
 
-        completeness = 100 - (data["total_missing"] / max(1, data["rows"] * data["cols"]) * 100)
+        total_cells = max(1, data.get("rows", 1) * max(1, data.get("cols", 1)))
+        completeness = max(0.0, min(100.0, 100.0 - (data.get("total_missing", 0) / total_cells * 100)))
 
-        # Key signals based on data characteristics
         signals = [
-            f"Data Volume: {data['rows']:,} records provide {'strong' if data['rows'] > 1000 else 'moderate'} statistical reliability.",
+            f"Data Volume: {data.get('rows', 0):,} records provide {'strong' if data.get('rows', 0) > 1000 else 'moderate'} statistical reliability.",
             f"Completeness: {completeness:.1f}% of data points are valid.",
-            f"Dimensionality: {data['cols']} variables enable {'multi-factor' if data['cols'] > 8 else 'focused'} analysis.",
+            f"Dimensionality: {data.get('cols', 0)} variables enable {'multi-factor' if data.get('cols', 0) > 8 else 'focused'} analysis.",
         ]
         if data.get("date_range", "N/A") != "N/A":
             signals.append(f"Temporal Coverage: {data['date_range']}.")
@@ -395,10 +543,11 @@ RULES:
         return {
             "domain": domain,
             "executive_synthesis": {
-                "observation": f"This {domain.lower()} dataset contains {data['rows']:,} records across {len(cols)} variables, with {completeness:.0f}% data completeness.",
-                "implication": "The data structure supports quantitative analysis. " + (
-                    "Time-series dimensions allow for trend identification and forecasting." if data.get("date_col")
-                    else "The cross-sectional structure is suited for comparative and distribution analysis."
+                "observation": f"This {domain.lower()} dataset contains {data.get('rows', 0):,} records across {len(cols)} variables, with {completeness:.0f}% data completeness.",
+                "implication": (
+                    "The data structure supports quantitative analysis. "
+                    + ("Time-series dimensions allow for trend identification and forecasting." if data.get("date_col")
+                       else "The cross-sectional structure is suited for comparative and distribution analysis.")
                 ),
             },
             "variable_intelligence": var_intel,
@@ -406,47 +555,62 @@ RULES:
             "recommended_actions": ["Analyze Trends Over Time", "Compare Categories", "Inspect Distributions"],
         }
 
-    def _generate_fallback_deep_dive(self, df: pd.DataFrame, profile: dict, question: str = "") -> dict:
+    def _generate_fallback_deep_dive(
+        self,
+        df: pd.DataFrame,
+        profile: Dict[str, Any],
+        question: str = "",
+    ) -> Dict[str, Any]:
         """Comprehensive rule-based deep dive analysis."""
         shape = profile.get("shape", {})
         missing = profile.get("missing_summary", {})
         dups = profile.get("duplicates", {})
 
-        # Analyze numeric columns
-        trends = []
-        anomalies = []
-        implications = []
+        trends: List[str] = []
+        anomalies: List[str] = []
+        implications: List[str] = []
 
         num_cols = [c for c, info in profile.get("columns", {}).items() if info.get("type") == "numeric"]
         for col in num_cols[:4]:
-            stats = profile["columns"][col].get("stats", {})
-            outliers = profile["columns"][col].get("outliers", {})
+            stats = profile.get("columns", {}).get(col, {}).get("stats", {})
+            outliers = profile.get("columns", {}).get(col, {}).get("outliers", {})
 
             skew = stats.get("skew", 0)
             if abs(skew) > 1:
                 direction = "right-skewed (positive)" if skew > 0 else "left-skewed (negative)"
-                trends.append(f"**{col}** is {direction} (skew={skew:.2f}), suggesting {'a few very high values' if skew > 0 else 'a few very low values'} may be pulling the average.")
+                trends.append(
+                    f"**{col}** is {direction} (skew={skew:.2f}), suggesting "
+                    f"{'a few very high values' if skew > 0 else 'a few very low values'} may be pulling the average."
+                )
 
             if outliers.get("count", 0) > 0:
-                anomalies.append(f"**{col}** has {outliers['count']} outliers ({outliers['pct']:.1f}% of values) outside the expected range [{outliers['lower_bound']:.1f}, {outliers['upper_bound']:.1f}].")
+                anomalies.append(
+                    f"**{col}** has {outliers['count']} outliers ({outliers['pct']:.1f}% of values) "
+                    f"outside the expected range [{outliers.get('lower_bound', 0):.1f}, {outliers.get('upper_bound', 0):.1f}]."
+                )
 
             cv = stats.get("cv", 0)
             if cv > 100:
-                implications.append(f"**{col}** shows high variability (CV={cv:.0f}%), indicating significant spread in the data that warrants investigation.")
+                implications.append(
+                    f"**{col}** shows high variability (CV={cv:.0f}%), indicating significant spread that warrants investigation."
+                )
 
-        # Data quality implications
         completeness_pct = missing.get("completeness_pct", 100)
         if completeness_pct < 95:
-            implications.append(f"Data completeness is {completeness_pct}%, which may introduce bias in analysis. Consider imputation or filtering strategies.")
+            implications.append(
+                f"Data completeness is {completeness_pct}%, which may introduce bias. Consider imputation or filtering strategies."
+            )
         if dups.get("duplicate_rows", 0) > 0:
-            implications.append(f"Found {dups['duplicate_rows']} duplicate rows ({dups['duplicate_pct']:.1f}%). These should be investigated and potentially removed.")
+            implications.append(
+                f"Found {dups['duplicate_rows']} duplicate rows ({dups.get('duplicate_pct', 0):.1f}%). These should be investigated and potentially removed."
+            )
 
         if not trends:
-            trends = ["No significant statistical trends detected in the available numeric data."]
+            trends = ["No significant statistical skew or anomalies detected in the available numeric data."]
         if not anomalies:
-            anomalies = ["No major outliers or anomalies detected using IQR analysis."]
+            anomalies = ["No major outliers detected using IQR standard analysis."]
         if not implications:
-            implications = ["Data appears well-structured for standard analytical workflows."]
+            implications = ["Data appears well-structured for standard business analytical workflows."]
 
         summary = (
             f"This dataset contains {shape.get('rows', 0):,} records across {shape.get('columns', 0)} variables. "
@@ -476,7 +640,7 @@ RULES:
             ],
         }
 
-    def _generate_fallback_executive_summary(self, df: pd.DataFrame, profile: dict) -> str:
+    def _generate_fallback_executive_summary(self, df: pd.DataFrame, profile: Dict[str, Any]) -> str:
         """Generate a rule-based executive summary in Markdown."""
         shape = profile.get("shape", {})
         missing = profile.get("missing_summary", {})
@@ -486,10 +650,9 @@ RULES:
         cat_cols = [c for c, info in profile.get("columns", {}).items() if info.get("type") == "categorical"]
         dt_cols = profile.get("datetime_columns", [])
 
-        # Key findings
         findings = []
         for col in num_cols[:3]:
-            stats = profile["columns"][col].get("stats", {})
+            stats = profile.get("columns", {}).get(col, {}).get("stats", {})
             findings.append(
                 f"**{col}**: Mean = {stats.get('mean', 0):,.2f}, "
                 f"Median = {stats.get('median', 0):,.2f}, "
@@ -497,19 +660,18 @@ RULES:
             )
 
         for col in cat_cols[:2]:
-            stats = profile["columns"][col].get("stats", {})
+            stats = profile.get("columns", {}).get(col, {}).get("stats", {})
             mode = stats.get("mode", "N/A")
             unique = stats.get("unique_count", 0)
             findings.append(f"**{col}**: {unique} unique values, most common = \"{mode}\"")
 
         findings_md = "\n".join(f"- {f}" for f in findings) if findings else "- No significant findings detected."
 
-        # Outlier summary
         outlier_notes = []
         for col in num_cols:
             outliers = profile.get("columns", {}).get(col, {}).get("outliers", {})
             if outliers.get("count", 0) > 0:
-                outlier_notes.append(f"- **{col}**: {outliers['count']} outliers ({outliers['pct']:.1f}%)")
+                outlier_notes.append(f"- **{col}**: {outliers['count']} outliers ({outliers.get('pct', 0):.1f}%)")
         outlier_md = "\n".join(outlier_notes) if outlier_notes else "- No significant outliers detected."
 
         return f"""## Executive Summary

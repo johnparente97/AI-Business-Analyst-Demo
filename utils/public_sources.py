@@ -1,16 +1,52 @@
 """
 InsightBridge AI — Public Data Source Connectors
-Free, no-API-key-required data sources for the Public Data Explorer.
+Free, no-API-key-required data connectors for the Public Data Explorer.
+Includes resilience, retries with exponential backoff, and caching.
 """
+from __future__ import annotations
+
+import io
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import pandas as pd
 import requests
-import streamlit as st
-import io
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
+try:
+    import streamlit as st
+    cache_data_decorator = st.cache_data(ttl=3600, show_spinner=False)
+except Exception:
+    def cache_data_decorator(func):
+        return func
+
+
+def _get_http_session(
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    status_forcelist: tuple[int, ...] = (429, 500, 502, 503, 504),
+) -> requests.Session:
+    """Create a requests session with automated retries and backoff."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+_HTTP_SESSION = _get_http_session()
 
 
 # ─── Source Registry ──────────────────────────────────────────────────────────
 
-SOURCES = [
+SOURCES: List[Dict[str, Any]] = [
     {
         "id": "world_bank",
         "name": "World Bank Open Data",
@@ -54,14 +90,19 @@ SOURCES = [
 ]
 
 
-def get_available_sources() -> list:
-    """Return the list of available public data sources."""
+def get_available_sources() -> List[Dict[str, Any]]:
+    """
+    Return the registry of available public data sources.
+
+    Returns:
+        List[Dict[str, Any]]: List of source metadata dictionaries.
+    """
     return SOURCES
 
 
 # ─── World Bank ───────────────────────────────────────────────────────────────
 
-WORLD_BANK_INDICATORS = {
+WORLD_BANK_INDICATORS: Dict[str, str] = {
     "GDP (current US$)": "NY.GDP.MKTP.CD",
     "GDP per capita (current US$)": "NY.GDP.PCAP.CD",
     "GDP growth (annual %)": "NY.GDP.MKTP.KD.ZG",
@@ -76,7 +117,7 @@ WORLD_BANK_INDICATORS = {
     "Foreign direct investment, net inflows (% of GDP)": "BX.KLT.DINV.WD.GD.ZS",
 }
 
-WORLD_BANK_REGIONS = {
+WORLD_BANK_REGIONS: Dict[str, str] = {
     "World": "WLD",
     "United States": "USA",
     "United Kingdom": "GBR",
@@ -96,12 +137,25 @@ WORLD_BANK_REGIONS = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_world_bank_data(indicator_name: str, country_code: str = "WLD",
-                          start_year: int = 2000, end_year: int = 2023) -> tuple:
+@cache_data_decorator
+def fetch_world_bank_data(
+    indicator_name: str,
+    country_code: str = "WLD",
+    start_year: int = 2000,
+    end_year: int = 2023,
+) -> Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
     """
-    Fetch data from the World Bank API.
-    Returns (DataFrame, metadata_dict) or (None, error_msg).
+    Fetch historical time series from the World Bank API.
+
+    Args:
+        indicator_name: User-friendly name or code for the indicator.
+        country_code: ISO3 country code (or 'WLD' for world aggregate).
+        start_year: Beginning calendar year.
+        end_year: Ending calendar year.
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
+            (DataFrame, metadata_dict) on success, or (None, error_message) on failure.
     """
     indicator_id = WORLD_BANK_INDICATORS.get(indicator_name, indicator_name)
     url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}"
@@ -112,22 +166,23 @@ def fetch_world_bank_data(indicator_name: str, country_code: str = "WLD",
     }
 
     try:
-        resp = requests.get(url, params=params, timeout=15)
+        resp = _HTTP_SESSION.get(url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
 
         if len(data) < 2 or not data[1]:
             return None, "No data returned for this indicator/country combination."
 
-        records = []
-        for item in data[1]:
-            records.append({
+        records = [
+            {
                 "Country": item.get("country", {}).get("value", ""),
                 "Country Code": item.get("countryiso3code", ""),
                 "Year": int(item.get("date", 0)),
                 "Value": item.get("value"),
                 "Indicator": item.get("indicator", {}).get("value", ""),
-            })
+            }
+            for item in data[1]
+        ]
 
         df = pd.DataFrame(records)
         df = df.dropna(subset=["Value"]).sort_values("Year").reset_index(drop=True)
@@ -151,7 +206,7 @@ def fetch_world_bank_data(indicator_name: str, country_code: str = "WLD",
 
 # ─── CDC Open Data (SODA API) ────────────────────────────────────────────────
 
-CDC_DATASETS = {
+CDC_DATASETS: Dict[str, str] = {
     "U.S. Chronic Disease Indicators (CDI)": "g4ie-h725",
     "COVID-19 Case Surveillance": "vbim-akqf",
     "Nutrition, Physical Activity, and Obesity": "hn4x-zwk7",
@@ -160,18 +215,28 @@ CDC_DATASETS = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_cdc_data(dataset_name: str, limit: int = 5000) -> tuple:
+@cache_data_decorator
+def fetch_cdc_data(
+    dataset_name: str,
+    limit: int = 5000,
+) -> Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
     """
-    Fetch data from CDC's SODA API.
-    Returns (DataFrame, metadata_dict) or (None, error_msg).
+    Fetch public health data from the CDC SODA API.
+
+    Args:
+        dataset_name: Display name or endpoint ID of the CDC dataset.
+        limit: Max record count to retrieve.
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
+            (DataFrame, metadata_dict) on success, or (None, error_message) on failure.
     """
     dataset_id = CDC_DATASETS.get(dataset_name, dataset_name)
     url = f"https://data.cdc.gov/resource/{dataset_id}.json"
     params = {"$limit": limit}
 
     try:
-        resp = requests.get(url, params=params, timeout=20)
+        resp = _HTTP_SESSION.get(url, params=params, timeout=20)
         resp.raise_for_status()
         data = resp.json()
 
@@ -180,7 +245,7 @@ def fetch_cdc_data(dataset_name: str, limit: int = 5000) -> tuple:
 
         df = pd.DataFrame(data)
 
-        # Try to convert numeric-looking columns
+        # Convert numeric-looking columns efficiently
         for col in df.columns:
             try:
                 df[col] = pd.to_numeric(df[col])
@@ -204,7 +269,7 @@ def fetch_cdc_data(dataset_name: str, limit: int = 5000) -> tuple:
 
 # ─── U.S. Census Bureau ──────────────────────────────────────────────────────
 
-CENSUS_VARIABLES = {
+CENSUS_VARIABLES: Dict[str, str] = {
     "Total Population": "B01001_001E",
     "Median Household Income": "B19013_001E",
     "Total Housing Units": "B25001_001E",
@@ -213,11 +278,21 @@ CENSUS_VARIABLES = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_census_data(variable_names: list, year: int = 2022) -> tuple:
+@cache_data_decorator
+def fetch_census_data(
+    variable_names: List[str],
+    year: int = 2022,
+) -> Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
     """
-    Fetch data from the U.S. Census Bureau ACS API.
-    Returns (DataFrame, metadata_dict) or (None, error_msg).
+    Fetch demographic indicators from the U.S. Census Bureau ACS 5-Year API.
+
+    Args:
+        variable_names: List of friendly Census variable names.
+        year: Survey year (default 2022).
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
+            (DataFrame, metadata_dict) on success, or (None, error_message) on failure.
     """
     var_ids = [CENSUS_VARIABLES.get(v, v) for v in variable_names]
     get_vars = ",".join(["NAME"] + var_ids)
@@ -225,7 +300,7 @@ def fetch_census_data(variable_names: list, year: int = 2022) -> tuple:
     params = {"get": get_vars, "for": "state:*"}
 
     try:
-        resp = requests.get(url, params=params, timeout=15)
+        resp = _HTTP_SESSION.get(url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
 
@@ -240,7 +315,6 @@ def fetch_census_data(variable_names: list, year: int = 2022) -> tuple:
         rename_map = {v: k for k, v in CENSUS_VARIABLES.items() if v in df.columns}
         df = df.rename(columns=rename_map)
 
-        # Convert numeric columns
         for col in df.columns:
             if col not in ["NAME", "state"]:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -249,7 +323,7 @@ def fetch_census_data(variable_names: list, year: int = 2022) -> tuple:
 
         metadata = {
             "source_name": "U.S. Census Bureau (ACS 5-Year)",
-            "source_url": f"https://data.census.gov",
+            "source_url": "https://data.census.gov",
             "variables": variable_names,
             "year": year,
             "records": len(df),
@@ -264,14 +338,20 @@ def fetch_census_data(variable_names: list, year: int = 2022) -> tuple:
 
 # ─── CSV from URL ─────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_csv_from_url(url: str) -> tuple:
+@cache_data_decorator
+def fetch_csv_from_url(url: str) -> Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
     """
-    Fetch a CSV file from any public URL.
-    Returns (DataFrame, metadata_dict) or (None, error_msg).
+    Fetch and parse a CSV file from a publicly accessible URL.
+
+    Args:
+        url: Direct link to the CSV resource.
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
+            (DataFrame, metadata_dict) on success, or (None, error_message) on failure.
     """
     try:
-        resp = requests.get(url, timeout=20, stream=True)
+        resp = _HTTP_SESSION.get(url, timeout=20, stream=True)
         resp.raise_for_status()
 
         content_type = resp.headers.get("Content-Type", "")
@@ -292,14 +372,14 @@ def fetch_csv_from_url(url: str) -> tuple:
         return df, metadata
 
     except pd.errors.ParserError:
-        return None, "Failed to parse the file as CSV. Check the URL points to a valid CSV."
+        return None, "Failed to parse the file as CSV. Check that the URL points to valid CSV data."
     except requests.exceptions.RequestException as e:
         return None, f"Request failed: {str(e)}"
 
 
-# ─── FRED (Optional — requires free API key) ─────────────────────────────────
+# ─── FRED (Federal Reserve) ──────────────────────────────────────────────────
 
-FRED_SERIES = {
+FRED_SERIES: Dict[str, str] = {
     "Unemployment Rate": "UNRATE",
     "Consumer Price Index (CPI)": "CPIAUCSL",
     "Federal Funds Rate": "FEDFUNDS",
@@ -311,12 +391,23 @@ FRED_SERIES = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_fred_data(series_name: str, api_key: str,
-                    start_date: str = "2000-01-01") -> tuple:
+@cache_data_decorator
+def fetch_fred_data(
+    series_name: str,
+    api_key: str,
+    start_date: str = "2000-01-01",
+) -> Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
     """
-    Fetch data from FRED API (requires free API key).
-    Returns (DataFrame, metadata_dict) or (None, error_msg).
+    Fetch economic time series from the FRED API.
+
+    Args:
+        series_name: Friendly name or FRED series identifier.
+        api_key: FRED API token.
+        start_date: Earliest observation date (YYYY-MM-DD).
+
+    Returns:
+        Tuple[Optional[pd.DataFrame], Union[Dict[str, Any], str]]:
+            (DataFrame, metadata_dict) on success, or (None, error_message) on failure.
     """
     series_id = FRED_SERIES.get(series_name, series_name)
     url = "https://api.stlouisfed.org/fred/series/observations"
@@ -328,7 +419,7 @@ def fetch_fred_data(series_name: str, api_key: str,
     }
 
     try:
-        resp = requests.get(url, params=params, timeout=15)
+        resp = _HTTP_SESSION.get(url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
 

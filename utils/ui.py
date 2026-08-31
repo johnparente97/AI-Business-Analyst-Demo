@@ -1,12 +1,17 @@
 """
 InsightBridge AI — UI Components & Styling
-Futuristic dark-mode glassmorphism design system.
+Futuristic dark-mode glassmorphism design system for Streamlit.
 """
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+import plotly.graph_objects as go
 import streamlit as st
 
 
 # ─── Color Palette ────────────────────────────────────────────────────────────
-COLORS = {
+COLORS: Dict[str, str] = {
     "bg_primary": "#0a0e27",
     "bg_secondary": "#111638",
     "bg_card": "rgba(17, 22, 56, 0.7)",
@@ -26,8 +31,8 @@ COLORS = {
 }
 
 
-def inject_custom_css():
-    """Inject the full dark-mode futuristic CSS design system."""
+def inject_custom_css() -> None:
+    """Inject the full dark-mode futuristic CSS design system into the Streamlit app."""
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -199,133 +204,80 @@ def inject_custom_css():
             align-items: center;
             gap: 6px;
             background: rgba(0, 212, 255, 0.08);
-            border: 1px solid rgba(0, 212, 255, 0.15);
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            margin-bottom: 12px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            color: #00d4ff;
+            font-weight: 500;
+            margin-bottom: 16px;
         }
 
         .source-badge a {
             color: #00d4ff;
-            text-decoration: none;
-        }
-
-        .source-badge a:hover {
             text-decoration: underline;
         }
 
-        /* ─── Empty State ─── */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #64748b;
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        .empty-state-text {
-            font-size: 1.1rem;
-            color: #94a3b8;
-            max-width: 400px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-
         /* ─── Buttons ─── */
-        .stButton button {
-            border-radius: 10px;
+        .stButton > button {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            color: #0a0e27;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
-            padding: 0.5rem 1.2rem;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-        }
-
-        .stButton button:hover {
-            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.15);
-            transform: translateY(-1px);
-        }
-
-        .stButton button[kind="primary"] {
-            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
-            color: white;
             border: none;
-        }
-
-        /* ─── Expanders ─── */
-        .streamlit-expanderHeader {
-            background: rgba(17, 22, 56, 0.4);
-            border: 1px solid rgba(0, 212, 255, 0.1);
             border-radius: 10px;
-            font-weight: 600;
+            padding: 8px 24px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px rgba(0, 212, 255, 0.25);
         }
 
-        /* ─── DataFrames ─── */
-        .stDataFrame {
-            border-radius: 12px;
-            overflow: hidden;
+        .stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+            color: #0a0e27;
         }
 
-        /* ─── File Uploader ─── */
-        .stFileUploader {
-            border-radius: 12px;
-        }
-
-        /* ─── Progress bars ─── */
-        .stProgress > div > div {
-            background: linear-gradient(90deg, #00d4ff, #7c3aed);
-            border-radius: 10px;
+        .stButton > button:active {
+            transform: translateY(0);
         }
 
         /* ─── Tabs ─── */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 4px;
+            gap: 8px;
+            background: rgba(17, 22, 56, 0.4);
+            border-radius: 12px;
+            padding: 4px;
+            border: 1px solid rgba(0, 212, 255, 0.08);
         }
 
         .stTabs [data-baseweb="tab"] {
-            border-radius: 8px 8px 0 0;
-            padding: 8px 20px;
+            border-radius: 8px;
+            color: #94a3b8;
             font-weight: 500;
+            padding: 8px 16px;
+            transition: all 0.2s ease;
         }
 
-        /* ─── Divider ─── */
-        hr {
-            border-color: rgba(0, 212, 255, 0.08);
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(124, 58, 237, 0.15)) !important;
+            color: #00d4ff !important;
+            border: 1px solid rgba(0, 212, 255, 0.3);
         }
 
-        /* ─── Selectbox / inputs ─── */
-        .stSelectbox, .stMultiSelect, .stTextInput, .stNumberInput {
-            border-radius: 10px;
+        /* ─── Dataframe ─── */
+        .stDataFrame {
+            border: 1px solid rgba(0, 212, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
         }
 
-        /* ─── Scrollbar ─── */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(17, 22, 56, 0.3);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(0, 212, 255, 0.2);
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 212, 255, 0.4);
-        }
-
-        /* ─── Hero gradient text ─── */
+        /* ─── Hero Section ─── */
         .hero-title {
             font-family: 'Outfit', sans-serif;
-            font-size: 3rem;
+            font-size: 2.8rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 50%, #ec4899 100%);
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #e2e8f0 0%, #00d4ff 50%, #7c3aed 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -336,15 +288,43 @@ def inject_custom_css():
         .hero-subtitle {
             font-size: 1.15rem;
             color: #94a3b8;
-            font-weight: 400;
-            line-height: 1.6;
             max-width: 600px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        /* ─── Empty State ─── */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            background: rgba(17, 22, 56, 0.4);
+            border: 2px dashed rgba(0, 212, 255, 0.15);
+            border-radius: 16px;
+            margin: 24px 0;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .empty-state-text {
+            color: #94a3b8;
+            font-size: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
         }
 
         /* ─── Animations ─── */
         @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .animate-in {
@@ -360,8 +340,8 @@ def inject_custom_css():
     """, unsafe_allow_html=True)
 
 
-def metric_card(title: str, value: str, description: str = "", icon: str = ""):
-    """Render a glassmorphic metric card."""
+def metric_card(title: str, value: str, description: str = "", icon: str = "") -> None:
+    """Render a glassmorphic metric card with optional icon and delta text."""
     icon_html = f'<span style="margin-right: 6px;">{icon}</span>' if icon else ""
     desc_html = f'<div class="metric-delta">{description}</div>' if description else ""
     st.markdown(f"""
@@ -373,8 +353,8 @@ def metric_card(title: str, value: str, description: str = "", icon: str = ""):
     """, unsafe_allow_html=True)
 
 
-def section_header(title: str, subtitle: str = ""):
-    """Render a consistent section header with gradient text."""
+def section_header(title: str, subtitle: str = "") -> None:
+    """Render a consistent section header with gradient typography."""
     sub_html = f'<div class="section-subtitle">{subtitle}</div>' if subtitle else ""
     st.markdown(f"""
     <div class="section-header animate-in">
@@ -384,8 +364,8 @@ def section_header(title: str, subtitle: str = ""):
     """, unsafe_allow_html=True)
 
 
-def glass_card(content_html: str):
-    """Render content inside a glassmorphic card."""
+def glass_card(content_html: str) -> None:
+    """Render raw HTML content inside a stylized glassmorphic card container."""
     st.markdown(f"""
     <div class="glass-card animate-in">
         {content_html}
@@ -393,8 +373,8 @@ def glass_card(content_html: str):
     """, unsafe_allow_html=True)
 
 
-def source_attribution(name: str, url: str):
-    """Render a source attribution badge with link."""
+def source_attribution(name: str, url: str) -> None:
+    """Render a data source attribution badge with an external hyperlink."""
     st.markdown(f"""
     <div class="source-badge">
         📡 Source: <a href="{url}" target="_blank">{name}</a>
@@ -402,8 +382,8 @@ def source_attribution(name: str, url: str):
     """, unsafe_allow_html=True)
 
 
-def empty_state(message: str, icon: str = "📭"):
-    """Render a beautiful empty state placeholder."""
+def empty_state(message: str, icon: str = "📭") -> None:
+    """Render an empty state placeholder with an icon and guidance message."""
     st.markdown(f"""
     <div class="empty-state animate-in">
         <div class="empty-state-icon">{icon}</div>
@@ -412,8 +392,8 @@ def empty_state(message: str, icon: str = "📭"):
     """, unsafe_allow_html=True)
 
 
-def hero_header(title: str, subtitle: str):
-    """Render the main hero header with gradient text."""
+def hero_header(title: str, subtitle: str) -> None:
+    """Render the primary application hero banner."""
     st.markdown(f"""
     <div class="animate-in" style="margin-bottom: 32px;">
         <div class="hero-title">{title}</div>
@@ -423,7 +403,7 @@ def hero_header(title: str, subtitle: str):
 
 
 # ─── Plotly Dark Theme Config ──────────────────────────────────────────────────
-PLOTLY_DARK_TEMPLATE = {
+PLOTLY_DARK_TEMPLATE: Dict[str, Any] = {
     "template": "plotly_dark",
     "paper_bgcolor": "rgba(0,0,0,0)",
     "plot_bgcolor": "rgba(0,0,0,0)",
@@ -437,7 +417,15 @@ PLOTLY_DARK_TEMPLATE = {
 }
 
 
-def apply_dark_layout(fig):
-    """Apply the dark futuristic layout to any Plotly figure."""
+def apply_dark_layout(fig: go.Figure) -> go.Figure:
+    """
+    Apply the standard dark futuristic theme to any Plotly graph object.
+
+    Args:
+        fig: Plotly Figure instance.
+
+    Returns:
+        go.Figure: Styled Plotly Figure.
+    """
     fig.update_layout(**PLOTLY_DARK_TEMPLATE)
     return fig

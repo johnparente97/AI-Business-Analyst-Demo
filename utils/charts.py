@@ -1,26 +1,45 @@
 """
-InsightBridge AI — Chart Generator
-Modern Plotly charts with dark futuristic theme.
+InsightBridge AI — High-Performance Chart Generator
+Interactive Plotly charts styled with a dark futuristic glassmorphism theme.
 """
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
-import pandas as pd
-import numpy as np
 from utils.ui import apply_dark_layout
 
-
 # ─── Color Palette ────────────────────────────────────────────────────────────
-PALETTE = ["#00d4ff", "#7c3aed", "#10b981", "#f59e0b", "#ec4899",
-           "#06b6d4", "#8b5cf6", "#f97316", "#14b8a6", "#a855f7"]
-GRADIENT_FILL = "rgba(0, 212, 255, 0.08)"
+PALETTE: List[str] = [
+    "#00d4ff", "#7c3aed", "#10b981", "#f59e0b", "#ec4899",
+    "#06b6d4", "#8b5cf6", "#f97316", "#14b8a6", "#a855f7"
+]
+GRADIENT_FILL: str = "rgba(0, 212, 255, 0.08)"
 
 
 # ─── Time Series ──────────────────────────────────────────────────────────────
 
-def create_time_series(df: pd.DataFrame, date_col: str, value_col: str,
-                       title: str = "📈 Trend Over Time") -> go.Figure:
-    """Create an enhanced time series chart with optional moving average."""
+def create_time_series(
+    df: pd.DataFrame,
+    date_col: str,
+    value_col: str,
+    title: str = "📈 Trend Over Time",
+) -> Optional[go.Figure]:
+    """
+    Create an enhanced time series chart with rolling moving average.
+
+    Args:
+        df: Input DataFrame.
+        date_col: Column name for timestamp/date.
+        value_col: Numeric metric column.
+        title: Main chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None if insufficient data.
+    """
     try:
         plot_df = df[[date_col, value_col]].copy()
         plot_df[date_col] = pd.to_datetime(plot_df[date_col], errors="coerce")
@@ -33,23 +52,27 @@ def create_time_series(df: pd.DataFrame, date_col: str, value_col: str,
 
         # Main line
         fig.add_trace(go.Scatter(
-            x=plot_df[date_col], y=plot_df[value_col],
-            mode="lines", name=value_col,
+            x=plot_df[date_col],
+            y=plot_df[value_col],
+            mode="lines",
+            name=value_col,
             line=dict(color="#00d4ff", width=2),
-            fill="tozeroy", fillcolor=GRADIENT_FILL,
+            fill="tozeroy",
+            fillcolor=GRADIENT_FILL,
         ))
 
-        # Moving average (if enough data points)
+        # Moving average
         if len(plot_df) >= 14:
             window = max(7, len(plot_df) // 20)
             plot_df["MA"] = plot_df[value_col].rolling(window=window, min_periods=1).mean()
             fig.add_trace(go.Scatter(
-                x=plot_df[date_col], y=plot_df["MA"],
-                mode="lines", name=f"{window}-period MA",
+                x=plot_df[date_col],
+                y=plot_df["MA"],
+                mode="lines",
+                name=f"{window}-period MA",
                 line=dict(color="#7c3aed", width=2, dash="dash"),
             ))
 
-        # Trend direction annotation
         direction = _trend_direction(plot_df[value_col])
         fig.update_layout(title=f"{title} <span style='font-size:13px;color:#94a3b8'>({direction})</span>")
         apply_dark_layout(fig)
@@ -58,8 +81,20 @@ def create_time_series(df: pd.DataFrame, date_col: str, value_col: str,
         return None
 
 
-def create_trend_chart(summary_data: dict, title: str = "📈 Activity Trends") -> go.Figure:
-    """Create a trend chart from legacy summary_data format."""
+def create_trend_chart(
+    summary_data: Optional[Dict[str, Any]],
+    title: str = "📈 Activity Trends",
+) -> Optional[go.Figure]:
+    """
+    Create a trend area chart from legacy summary_data format.
+
+    Args:
+        summary_data: Dictionary containing 'trend_sorted'.
+        title: Main chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     if not summary_data or not summary_data.get("trend_sorted"):
         return None
 
@@ -72,8 +107,12 @@ def create_trend_chart(summary_data: dict, title: str = "📈 Activity Trends") 
     df = df.sort_values("Date")
 
     direction = _trend_direction(df["Records"])
-    fig = px.area(df, x="Date", y="Records",
-                  title=f"{title} <span style='font-size:13px;color:#94a3b8'>({direction})</span>")
+    fig = px.area(
+        df,
+        x="Date",
+        y="Records",
+        title=f"{title} <span style='font-size:13px;color:#94a3b8'>({direction})</span>",
+    )
     fig.update_traces(line_color="#00d4ff", fillcolor=GRADIENT_FILL)
     apply_dark_layout(fig)
     return fig
@@ -81,14 +120,24 @@ def create_trend_chart(summary_data: dict, title: str = "📈 Activity Trends") 
 
 # ─── Correlation Heatmap ──────────────────────────────────────────────────────
 
-def create_correlation_heatmap(df: pd.DataFrame,
-                               title: str = "🔥 Correlation Matrix") -> go.Figure:
-    """Create a correlation heatmap for numeric columns."""
+def create_correlation_heatmap(
+    df: pd.DataFrame,
+    title: str = "🔥 Correlation Matrix",
+) -> Optional[go.Figure]:
+    """
+    Create an annotated correlation matrix heatmap for numeric columns.
+
+    Args:
+        df: Input DataFrame.
+        title: Main chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     numeric_df = df.select_dtypes(include=[np.number])
     if numeric_df.shape[1] < 2:
         return None
 
-    # Limit to 12 columns for readability
     cols = numeric_df.columns[:12].tolist()
     corr = numeric_df[cols].corr()
 
@@ -103,7 +152,8 @@ def create_correlation_heatmap(df: pd.DataFrame,
             [0.75, "#0e4c7c"],
             [1.0, "#00d4ff"],
         ],
-        zmin=-1, zmax=1,
+        zmin=-1,
+        zmax=1,
         text=corr.round(2).values,
         texttemplate="%{text}",
         textfont={"size": 10},
@@ -117,9 +167,22 @@ def create_correlation_heatmap(df: pd.DataFrame,
 
 # ─── Distribution Chart ──────────────────────────────────────────────────────
 
-def create_distribution_chart(df: pd.DataFrame, column: str,
-                               title: str = "") -> go.Figure:
-    """Create a histogram with KDE-style overlay for a numeric column."""
+def create_distribution_chart(
+    df: pd.DataFrame,
+    column: str,
+    title: str = "",
+) -> Optional[go.Figure]:
+    """
+    Create a frequency histogram with mean and median indicators.
+
+    Args:
+        df: Input DataFrame.
+        column: Numeric column name.
+        title: Optional custom title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     if column not in df.columns:
         return None
 
@@ -131,19 +194,30 @@ def create_distribution_chart(df: pd.DataFrame, column: str,
     fig = go.Figure()
 
     fig.add_trace(go.Histogram(
-        x=clean, nbinsx=50,
-        marker_color="#00d4ff", opacity=0.7,
+        x=clean,
+        nbinsx=50,
+        marker_color="#00d4ff",
+        opacity=0.7,
         name="Frequency",
     ))
 
-    # Add mean + median vertical lines
-    mean_val = clean.mean()
-    median_val = clean.median()
+    mean_val = float(clean.mean())
+    median_val = float(clean.median())
 
-    fig.add_vline(x=mean_val, line_dash="dash", line_color="#f59e0b",
-                  annotation_text=f"Mean: {mean_val:.2f}", annotation_font_color="#f59e0b")
-    fig.add_vline(x=median_val, line_dash="dot", line_color="#10b981",
-                  annotation_text=f"Median: {median_val:.2f}", annotation_font_color="#10b981")
+    fig.add_vline(
+        x=mean_val,
+        line_dash="dash",
+        line_color="#f59e0b",
+        annotation_text=f"Mean: {mean_val:.2f}",
+        annotation_font_color="#f59e0b",
+    )
+    fig.add_vline(
+        x=median_val,
+        line_dash="dot",
+        line_color="#10b981",
+        annotation_text=f"Median: {median_val:.2f}",
+        annotation_font_color="#10b981",
+    )
 
     fig.update_layout(title=display_title, xaxis_title=column, yaxis_title="Frequency")
     apply_dark_layout(fig)
@@ -152,9 +226,22 @@ def create_distribution_chart(df: pd.DataFrame, column: str,
 
 # ─── Box Plot ─────────────────────────────────────────────────────────────────
 
-def create_box_plot(df: pd.DataFrame, columns: list,
-                    title: str = "📦 Outlier Detection") -> go.Figure:
-    """Create box plots for multiple numeric columns."""
+def create_box_plot(
+    df: pd.DataFrame,
+    columns: List[str],
+    title: str = "📦 Outlier Detection",
+) -> Optional[go.Figure]:
+    """
+    Create multi-variable box plots for detecting distribution spread and outliers.
+
+    Args:
+        df: Input DataFrame.
+        columns: List of column names to plot.
+        title: Main chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     valid_cols = [c for c in columns if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
     if not valid_cols:
         return None
@@ -162,7 +249,8 @@ def create_box_plot(df: pd.DataFrame, columns: list,
     fig = go.Figure()
     for i, col in enumerate(valid_cols[:6]):
         fig.add_trace(go.Box(
-            y=df[col].dropna(), name=col,
+            y=df[col].dropna(),
+            name=col,
             marker_color=PALETTE[i % len(PALETTE)],
             boxmean="sd",
         ))
@@ -174,16 +262,32 @@ def create_box_plot(df: pd.DataFrame, columns: list,
 
 # ─── Scatter Plot ─────────────────────────────────────────────────────────────
 
-def create_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str,
-                        color_col: str = None,
-                        title: str = "") -> go.Figure:
-    """Create a scatter plot between two numeric columns."""
+def create_scatter_plot(
+    df: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    color_col: Optional[str] = None,
+    title: str = "",
+) -> Optional[go.Figure]:
+    """
+    Create a 2D scatter plot exploring correlation between two continuous metrics.
+
+    Args:
+        df: Input DataFrame.
+        x_col: X-axis metric column.
+        y_col: Y-axis metric column.
+        color_col: Optional grouping categorical column.
+        title: Optional custom chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     if x_col not in df.columns or y_col not in df.columns:
         return None
 
     display_title = title or f"🔬 {x_col} vs {y_col}"
 
-    kwargs = {"x": x_col, "y": y_col, "title": display_title, "opacity": 0.7}
+    kwargs: Dict[str, Any] = {"x": x_col, "y": y_col, "title": display_title, "opacity": 0.7}
     if color_col and color_col in df.columns:
         kwargs["color"] = color_col
         kwargs["color_discrete_sequence"] = PALETTE
@@ -198,10 +302,24 @@ def create_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str,
 
 # ─── Categorical Bar Chart ───────────────────────────────────────────────────
 
-def create_categorical_chart(summary_data: dict = None, df: pd.DataFrame = None,
-                              column: str = None,
-                              title: str = "📊 Category Breakdown") -> go.Figure:
-    """Create a horizontal bar chart for categorical data."""
+def create_categorical_chart(
+    summary_data: Optional[Dict[str, Any]] = None,
+    df: Optional[pd.DataFrame] = None,
+    column: Optional[str] = None,
+    title: str = "📊 Category Breakdown",
+) -> Optional[go.Figure]:
+    """
+    Create a horizontal frequency bar chart for high-cardinality or categorical dimensions.
+
+    Args:
+        summary_data: Optional legacy summary dictionary.
+        df: Optional pandas DataFrame.
+        column: Categorical column name.
+        title: Chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     if df is not None and column and column in df.columns:
         vc = df[column].value_counts().head(15)
         bar_df = pd.DataFrame({"Category": vc.index.astype(str), "Count": vc.values})
@@ -216,8 +334,15 @@ def create_categorical_chart(summary_data: dict = None, df: pd.DataFrame = None,
     else:
         return None
 
-    fig = px.bar(bar_df, x="Count", y="Category", orientation="h",
-                 text="Count", title=title, color_discrete_sequence=["#10b981"])
+    fig = px.bar(
+        bar_df,
+        x="Count",
+        y="Category",
+        orientation="h",
+        text="Count",
+        title=title,
+        color_discrete_sequence=["#10b981"],
+    )
     fig.update_traces(textposition="outside")
     fig.update_layout(yaxis={"categoryorder": "total ascending"})
     apply_dark_layout(fig)
@@ -226,9 +351,22 @@ def create_categorical_chart(summary_data: dict = None, df: pd.DataFrame = None,
 
 # ─── Pie / Donut Chart ───────────────────────────────────────────────────────
 
-def create_pie_chart(df: pd.DataFrame, column: str,
-                     title: str = "") -> go.Figure:
-    """Create a donut chart for categorical column composition."""
+def create_pie_chart(
+    df: pd.DataFrame,
+    column: str,
+    title: str = "",
+) -> Optional[go.Figure]:
+    """
+    Create a donut composition chart for low-cardinality categorical variables.
+
+    Args:
+        df: Input DataFrame.
+        column: Categorical column name.
+        title: Optional custom chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     if column not in df.columns:
         return None
 
@@ -236,24 +374,39 @@ def create_pie_chart(df: pd.DataFrame, column: str,
     display_title = title or f"🍩 Composition: {column}"
 
     fig = go.Figure(data=[go.Pie(
-        labels=vc.index.astype(str), values=vc.values,
+        labels=vc.index.astype(str),
+        values=vc.values,
         hole=0.5,
         marker=dict(colors=PALETTE[:len(vc)]),
         textinfo="label+percent",
         textfont=dict(size=11, color="#e2e8f0"),
     )])
 
-    fig.update_layout(title=display_title, showlegend=True,
-                      legend=dict(font=dict(color="#94a3b8")))
+    fig.update_layout(
+        title=display_title,
+        showlegend=True,
+        legend=dict(font=dict(color="#94a3b8")),
+    )
     apply_dark_layout(fig)
     return fig
 
 
 # ─── Missing Values Chart ────────────────────────────────────────────────────
 
-def create_missing_values_chart(df: pd.DataFrame,
-                                 title: str = "🕳️ Missing Values") -> go.Figure:
-    """Visualize missing values per column."""
+def create_missing_values_chart(
+    df: pd.DataFrame,
+    title: str = "🕳️ Missing Values",
+) -> Optional[go.Figure]:
+    """
+    Visualize missing value percentages per column.
+
+    Args:
+        df: Input DataFrame.
+        title: Chart title.
+
+    Returns:
+        Optional[go.Figure]: Configured Plotly Figure or None.
+    """
     missing = df.isnull().sum()
     missing = missing[missing > 0].sort_values(ascending=True)
 
@@ -263,7 +416,8 @@ def create_missing_values_chart(df: pd.DataFrame,
     pct = (missing / len(df) * 100).round(2)
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=pct.values, y=pct.index.tolist(),
+        x=pct.values,
+        y=pct.index.tolist(),
         orientation="h",
         marker_color=["#ef4444" if p > 50 else "#f59e0b" if p > 20 else "#10b981" for p in pct.values],
         text=[f"{p}%" for p in pct.values],
@@ -278,7 +432,15 @@ def create_missing_values_chart(df: pd.DataFrame,
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 def _trend_direction(series: pd.Series) -> str:
-    """Simple heuristic to determine trend direction."""
+    """
+    Compute slope-based heuristic to determine trend direction.
+
+    Args:
+        series: Pandas series of numeric values.
+
+    Returns:
+        str: Description label indicating trajectory.
+    """
     if len(series) < 5:
         return "Stable"
     x = np.arange(len(series))

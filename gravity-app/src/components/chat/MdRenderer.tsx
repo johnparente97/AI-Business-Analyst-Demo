@@ -38,9 +38,9 @@ export function MdRenderer({ text, isDark: dk, showCursor }: { text: string; isD
         </div>
       )
     // Numbered list
-    } else if (/^\d+[\.\)]\s/.test(trim)) {
+    } else if (/^\d+[.)]\s/.test(trim)) {
       const num = trim.match(/^(\d+)/)?.[1]
-      const rest = trim.replace(/^\d+[\.\)]\s*/, '')
+      const rest = trim.replace(/^\d+[.)]\s*/, '')
       nodes.push(
         <div key={key++} className="flex items-start gap-1.5 mb-1">
           <span className={`text-[10px] font-bold text-violet-500 shrink-0 mt-0.5 w-4`}>{num}.</span>

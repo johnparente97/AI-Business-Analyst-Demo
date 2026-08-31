@@ -36,28 +36,12 @@ export function ChatPanel({
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const initialRanRef = useRef(false)
 
   const systemPrompt = useMemo(
     () => buildSystemPrompt(source, insights.fieldStats, records),
     [source, insights, records]
   )
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  useEffect(() => {
-    if (llmConfig && messages.length === 0 && records.length > 0) {
-      runInitialAnalysis()
-    }
-  }, [llmConfig, records]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
-    if (lastAssistant && lastAssistant.content !== aiInsights) {
-      setAiInsights(lastAssistant.content)
-    }
-  }, [messages]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runInitialAnalysis = useCallback(async () => {
     if (!llmConfig) return
@@ -96,6 +80,27 @@ export function ChatPanel({
       setAiLoading(false)
     }
   }, [llmConfig, systemPrompt, appendAiInsights, setAiLoading, setAiError])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    if (llmConfig && messages.length === 0 && records.length > 0 && !initialRanRef.current) {
+      initialRanRef.current = true
+      const timer = setTimeout(() => {
+        runInitialAnalysis()
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [llmConfig, messages.length, records.length, runInitialAnalysis])
+
+  useEffect(() => {
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+    if (lastAssistant && lastAssistant.content !== aiInsights) {
+      setAiInsights(lastAssistant.content)
+    }
+  }, [messages, aiInsights, setAiInsights])
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim()
